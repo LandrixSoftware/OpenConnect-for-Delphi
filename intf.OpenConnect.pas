@@ -54,6 +54,7 @@ type
   public
     ID : Integer;
     Description : String;
+    ServiceURL : String;
     Supplier : TOpenConnectSupplierList;
     constructor Create;
     destructor Destroy; override;
@@ -65,7 +66,7 @@ type
   TOpenConnectBusinessList = class(TObjectList<TOpenConnectBusiness>)
 	  procedure AssignTo(_Dest : TOpenConnectBusinessList);
   	function  Duplicate : TOpenConnectBusinessList;
-    function  GetItemByBusiness(const _ID : Integer;_CreateIfNotExists : Boolean = false) : TOpenConnectBusiness;
+    function  GetItemByBusiness(const _ID : Integer;const _ServiceURL : String; _CreateIfNotExists : Boolean = false) : TOpenConnectBusiness;
   end;
 
   TOpenConnectHelper = class(TObject)
@@ -74,9 +75,9 @@ type
     SHKCONNECT_SERVICE_SHKGH = 'https://shkgh20.shk-connect.de';
     SHKCONNECT_SERVICE_OC    = 'https://o-connect.de';
 
-    SHKCONNECT_SERVICE_BL  = '/services/Branchenliste';
-    SHKCONNECT_SERVICE_AA  = '/services/AllgemeineAuskuenfte';
-    SHKCONNECT_SERVICE_AIA = '/services/AnwenderIndividuelleAuskuenfte';
+    SHKCONNECT_SERVICE_PROC_BL  = '/services/Branchenliste';
+    SHKCONNECT_SERVICE_PROC_AA  = '/services/AllgemeineAuskuenfte';
+    SHKCONNECT_SERVICE_PROC_AIA = '/services/AnwenderIndividuelleAuskuenfte';
   public
     class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
   end;
@@ -173,6 +174,7 @@ procedure TOpenConnectBusiness.AssignTo(_Dest: TOpenConnectBusiness);
 begin
   _Dest.ID := ID;
   _Dest.Description := Description;
+  _Dest.ServiceURL := ServiceURL;
   Supplier.AssignTo(_Dest.Supplier);
 end;
 
@@ -180,6 +182,7 @@ procedure TOpenConnectBusiness.Clear;
 begin
   ID := -1;
   Description := '';
+  ServiceURL := '';
   Supplier.Clear;
 end;
 
@@ -192,13 +195,13 @@ end;
 { TOpenConnectBusinessList }
 
 function TOpenConnectBusinessList.GetItemByBusiness(const _ID: Integer;
-  _CreateIfNotExists: Boolean): TOpenConnectBusiness;
+  const _ServiceURL : String; _CreateIfNotExists: Boolean): TOpenConnectBusiness;
 var
   i : Integer;
 begin
   REsult := nil;
   for I := 0 to Count - 1 do
-  if Items[i].ID = _ID then
+  if (Items[i].ID = _ID) and SameText(Items[i].ServiceURL,_ServiceURL) then
   begin
     Result := Items[i];
     break;
@@ -207,6 +210,7 @@ begin
   begin
     Result := TOpenConnectBusiness.Create;
     Result.ID := _ID;
+    Result.ServiceURL := _ServiceURL;
     Add(Result);
   end;
 end;
@@ -256,14 +260,14 @@ begin
     bl_gb.Softwarename := OPENCONNECT_LOGIN;
     bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
-    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_BL);
+    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_PROC_BL);
     bl_resp := bl_b.GetBranchenListe(bl_gb);
 
     if bl_resp.Status.Code = '0' then
     begin
       for bl_br in bl_resp.Branche do
       begin
-        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,true);
+        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_ARGE,true);
         businessItm.Description := bl_br.Name_;
       end;
     end;// else
@@ -283,14 +287,14 @@ begin
     bl_gb.Softwarename := OPENCONNECT_LOGIN;
     bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
-    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_BL);
+    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_PROC_BL);
     bl_resp := bl_b.GetBranchenListe(bl_gb);
 
     if bl_resp.Status.Code = '0' then
     begin
       for bl_br in bl_resp.Branche do
       begin
-        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,true);
+        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_SHKGH,true);
         businessItm.Description := bl_br.Name_;
       end;
     end;// else
@@ -310,14 +314,14 @@ begin
     bl_gb.Softwarename := OPENCONNECT_LOGIN;
     bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
-    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_BL);
+    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_PROC_BL);
     bl_resp := bl_b.GetBranchenListe(bl_gb);
 
     if bl_resp.Status.Code = '0' then
     begin
       for bl_br in bl_resp.Branche do
       begin
-        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,true);
+        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_OC,true);
         businessItm.Description := bl_br.Name_;
       end;
     end;// else
@@ -343,7 +347,7 @@ begin
       aa_gb.BrancheID := IntToStr(_ResultList[i].ID);
 
       try
-      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_AA);
+      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_PROC_AA);
       aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
 
       if aa_resp.Status.Code = '0' then
@@ -368,7 +372,7 @@ begin
       end;
 
       try
-      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_AA);
+      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_PROC_AA);
       aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
 
       if aa_resp.Status.Code = '0' then
@@ -393,7 +397,7 @@ begin
       end;
 
       try
-      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_AA);
+      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_PROC_AA);
       aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
 
       if aa_resp.Status.Code = '0' then
@@ -422,6 +426,8 @@ begin
   except
 //    On E:Exception do begin TLog.Log(true,P_ERROR,'GetAllgemeineAuskuenfteBean',e); exit; end;
   end;
+
+  Result := true;
 end;
 
 end.
