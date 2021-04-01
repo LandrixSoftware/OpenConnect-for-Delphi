@@ -26,7 +26,7 @@
 #*.obj
 #
 
-Samples/intf.OpenConnect.inc
+intf.OpenConnect.inc
 Samples/Win32
 Samples/Win64
 

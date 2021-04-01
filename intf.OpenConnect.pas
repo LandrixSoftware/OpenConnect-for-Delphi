@@ -28,7 +28,7 @@ uses
   ;
 
 type
-  TSHKConnectSupplier = class
+  TOpenConnectSupplier = class(TObject)
   public
     ID:      Integer;
     Name :   string ;
@@ -40,35 +40,35 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
-	  procedure AssignTo(_Dest : TSHKConnectSupplier);
-  	function  Duplicate : TSHKConnectSupplier;
+	  procedure AssignTo(_Dest : TOpenConnectSupplier);
+  	function  Duplicate : TOpenConnectSupplier;
   end;
 
-  TSHKConnectSupplierList = class(TObjectList<TSHKConnectSupplier>)
-	  procedure AssignTo(_Dest : TSHKConnectSupplierList);
-  	function  Duplicate : TSHKConnectSupplierList;
-    function  GetItemBySupplierID(const _ID : Integer) : TSHKConnectSupplier;
+  TOpenConnectSupplierList = class(TObjectList<TOpenConnectSupplier>)
+	  procedure AssignTo(_Dest : TOpenConnectSupplierList);
+  	function  Duplicate : TOpenConnectSupplierList;
+    function  GetItemBySupplierID(const _ID : Integer) : TOpenConnectSupplier;
   end;
 
-  TSHKConnectBusiness = class
+  TOpenConnectBusiness = class(TObject)
   public
     ID : Integer;
     Description : String;
-    Supplier : TSHKConnectSupplierList;
+    Supplier : TOpenConnectSupplierList;
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
-	  procedure AssignTo(_Dest : TSHKConnectBusiness);
-  	function  Duplicate : TSHKConnectBusiness;
+	  procedure AssignTo(_Dest : TOpenConnectBusiness);
+  	function  Duplicate : TOpenConnectBusiness;
   end;
 
-  TSHKConnectBusinessList = class(TObjectList<TSHKConnectBusiness>)
-	  procedure AssignTo(_Dest : TSHKConnectBusinessList);
-  	function  Duplicate : TSHKConnectBusinessList;
-    function  GetItemByBusiness(const _ID : Integer;_CreateIfNotExists : Boolean = false) : TSHKConnectBusiness;
+  TOpenConnectBusinessList = class(TObjectList<TOpenConnectBusiness>)
+	  procedure AssignTo(_Dest : TOpenConnectBusinessList);
+  	function  Duplicate : TOpenConnectBusinessList;
+    function  GetItemByBusiness(const _ID : Integer;_CreateIfNotExists : Boolean = false) : TOpenConnectBusiness;
   end;
 
-  TSHKConnectHelper = class(TObject)
+  TOpenConnectHelper = class(TObject)
   public const
     SHKCONNECT_SERVICE_ARGE  = 'https://arge20.shk-connect.de';
     SHKCONNECT_SERVICE_SHKGH = 'https://shkgh20.shk-connect.de';
@@ -78,7 +78,7 @@ type
     SHKCONNECT_SERVICE_AA  = '/services/AllgemeineAuskuenfte';
     SHKCONNECT_SERVICE_AIA = '/services/AnwenderIndividuelleAuskuenfte';
   public
-    class function GetSupplierList(_ResultList : TSHKConnectBusinessList) : Boolean;
+    class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
   end;
 
 implementation
@@ -90,9 +90,9 @@ uses
 
 {$I intf.OpenConnect.inc}
 
-{ TSHKConnectSupplier }
+{ TOpenConnectSupplier }
 
-procedure TSHKConnectSupplier.AssignTo(_Dest: TSHKConnectSupplier);
+procedure TOpenConnectSupplier.AssignTo(_Dest: TOpenConnectSupplier);
 begin
   _Dest.ID := ID;
   _Dest.Name := Name;
@@ -103,7 +103,7 @@ begin
   _Dest.ServiceURL := ServiceURL;
 end;
 
-procedure TSHKConnectSupplier.Clear;
+procedure TOpenConnectSupplier.Clear;
 begin
   ID := -1;
   Name := '';
@@ -114,33 +114,33 @@ begin
   ServiceURL := '';
 end;
 
-function TSHKConnectSupplier.Duplicate: TSHKConnectSupplier;
+function TOpenConnectSupplier.Duplicate: TOpenConnectSupplier;
 begin
-  Result := TSHKConnectSupplier.Create;
+  Result := TOpenConnectSupplier.Create;
   AssignTo(Result);
 end;
 
-constructor TSHKConnectSupplier.Create;
+constructor TOpenConnectSupplier.Create;
 begin
   Clear;
 end;
 
-destructor TSHKConnectSupplier.Destroy;
+destructor TOpenConnectSupplier.Destroy;
 begin
   inherited;
 end;
 
-{ TSHKConnectSupplierList }
+{ TOpenConnectSupplierList }
 
-function TSHKConnectSupplierList.GetItemBySupplierID(
-  const _ID: Integer): TSHKConnectSupplier;
+function TOpenConnectSupplierList.GetItemBySupplierID(
+  const _ID: Integer): TOpenConnectSupplier;
 begin
-  Result := TSHKConnectSupplier.Create;
+  Result := TOpenConnectSupplier.Create;
   Result.ID := _ID;
   Add(Result);
 end;
 
-procedure TSHKConnectSupplierList.AssignTo(_Dest: TSHKConnectSupplierList);
+procedure TOpenConnectSupplierList.AssignTo(_Dest: TOpenConnectSupplierList);
 var
   i : Integer;
 begin
@@ -149,50 +149,50 @@ begin
     _Dest.Add(Items[i].Duplicate);
 end;
 
-function TSHKConnectSupplierList.Duplicate : TSHKConnectSupplierList;
+function TOpenConnectSupplierList.Duplicate : TOpenConnectSupplierList;
 begin
-  Result := TSHKConnectSupplierList.Create;
+  Result := TOpenConnectSupplierList.Create;
   AssignTo(Result);
 end;
 
-{ TSHKConnectBusiness }
+{ TOpenConnectBusiness }
 
-constructor TSHKConnectBusiness.Create;
+constructor TOpenConnectBusiness.Create;
 begin
-  Supplier := TSHKConnectSupplierList.Create;
+  Supplier := TOpenConnectSupplierList.Create;
   Clear;
 end;
 
-destructor TSHKConnectBusiness.Destroy;
+destructor TOpenConnectBusiness.Destroy;
 begin
   if Assigned(Supplier) then begin Supplier.Free; Supplier := nil; end;
   inherited;
 end;
 
-procedure TSHKConnectBusiness.AssignTo(_Dest: TSHKConnectBusiness);
+procedure TOpenConnectBusiness.AssignTo(_Dest: TOpenConnectBusiness);
 begin
   _Dest.ID := ID;
   _Dest.Description := Description;
   Supplier.AssignTo(_Dest.Supplier);
 end;
 
-procedure TSHKConnectBusiness.Clear;
+procedure TOpenConnectBusiness.Clear;
 begin
   ID := -1;
   Description := '';
   Supplier.Clear;
 end;
 
-function TSHKConnectBusiness.Duplicate: TSHKConnectBusiness;
+function TOpenConnectBusiness.Duplicate: TOpenConnectBusiness;
 begin
-  Result := TSHKConnectBusiness.Create;
+  Result := TOpenConnectBusiness.Create;
   AssignTo(Result);
 end;
 
-{ TSHKConnectBusinessList }
+{ TOpenConnectBusinessList }
 
-function TSHKConnectBusinessList.GetItemByBusiness(const _ID: Integer;
-  _CreateIfNotExists: Boolean): TSHKConnectBusiness;
+function TOpenConnectBusinessList.GetItemByBusiness(const _ID: Integer;
+  _CreateIfNotExists: Boolean): TOpenConnectBusiness;
 var
   i : Integer;
 begin
@@ -205,13 +205,13 @@ begin
   end;
   if (Result = nil) and (_CreateIfNotExists) then
   begin
-    Result := TSHKConnectBusiness.Create;
+    Result := TOpenConnectBusiness.Create;
     Result.ID := _ID;
     Add(Result);
   end;
 end;
 
-procedure TSHKConnectBusinessList.AssignTo(_Dest: TSHKConnectBusinessList);
+procedure TOpenConnectBusinessList.AssignTo(_Dest: TOpenConnectBusinessList);
 var
   i : Integer;
 begin
@@ -220,15 +220,15 @@ begin
     _Dest.Add(Items[i].Duplicate);
 end;
 
-function TSHKConnectBusinessList.Duplicate : TSHKConnectBusinessList;
+function TOpenConnectBusinessList.Duplicate : TOpenConnectBusinessList;
 begin
-  Result := TSHKConnectBusinessList.Create;
+  Result := TOpenConnectBusinessList.Create;
   AssignTo(Result);
 end;
 
-{ TSHKConnectHelper }
+{ TOpenConnectHelper }
 
-class function TSHKConnectHelper.GetSupplierList(_ResultList: TSHKConnectBusinessList): Boolean;
+class function TOpenConnectHelper.GetSupplierList(_ResultList: TOpenConnectBusinessList): Boolean;
 var
   bl_gb : GetBranchenListe;
   bl_b : BranchenlisteBean;
@@ -242,8 +242,8 @@ var
 
   i : Integer;
 
-  businessItm : TSHKConnectBusiness;
-  supplierItm : TSHKConnectSupplier;
+  businessItm : TOpenConnectBusiness;
+  supplierItm : TOpenConnectSupplier;
 begin
   Result := false;
 
@@ -253,8 +253,8 @@ begin
   try
     bl_gb := GetBranchenListe.Create;
     bl_gb.Schnittstellenversion := '2.0';
-    bl_gb.Softwarename := SHKCONNECT_LOGIN;
-    bl_gb.Softwarepasswort := SHKCONNECT_PWD;
+    bl_gb.Softwarename := OPENCONNECT_LOGIN;
+    bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
     bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_BL);
     bl_resp := bl_b.GetBranchenListe(bl_gb);
@@ -280,8 +280,8 @@ begin
   try
     bl_gb := GetBranchenListe.Create;
     bl_gb.Schnittstellenversion := '2.0';
-    bl_gb.Softwarename := SHKCONNECT_LOGIN;
-    bl_gb.Softwarepasswort := SHKCONNECT_PWD;
+    bl_gb.Softwarename := OPENCONNECT_LOGIN;
+    bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
     bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_BL);
     bl_resp := bl_b.GetBranchenListe(bl_gb);
@@ -307,8 +307,8 @@ begin
   try
     bl_gb := GetBranchenListe.Create;
     bl_gb.Schnittstellenversion := '2.0';
-    bl_gb.Softwarename := SHKCONNECT_LOGIN;
-    bl_gb.Softwarepasswort := SHKCONNECT_PWD;
+    bl_gb.Softwarename := OPENCONNECT_LOGIN;
+    bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
     bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_BL);
     bl_resp := bl_b.GetBranchenListe(bl_gb);
@@ -335,8 +335,8 @@ begin
     aa_gb := GetAllgemeineAuskunft.Create;
     aa_gb.Schnittstellenversion := '2.0';
 
-    aa_gb.Softwarename := SHKCONNECT_LOGIN;
-    aa_gb.Softwarepasswort := SHKCONNECT_PWD;
+    aa_gb.Softwarename := OPENCONNECT_LOGIN;
+    aa_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
     for i := 0 to _ResultList.Count - 1 do
     begin
