@@ -29,6 +29,7 @@
 intf.OpenConnect.inc
 Samples/Win32
 Samples/Win64
+Samples/configuration.ini
 
 # Delphi compiler-generated binaries (safe to delete)
 *.exe

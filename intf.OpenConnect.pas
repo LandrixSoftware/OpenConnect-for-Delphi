@@ -69,8 +69,24 @@ type
     function  GetItemByBusiness(const _ID : Integer;const _ServiceURL : String; _CreateIfNotExists : Boolean = false) : TOpenConnectBusiness;
   end;
 
+  TOpenConnectLoginOptions = record
+    SupplierID : Integer;
+    CustomerNo : String;
+    Username : String;
+    Password : String;
+    ServiceURL : String;
+  end;
+
+  TOpenConnectIDSConnectivity = record
+    IDSConnectAvailable : Boolean;
+    IDSConnectURL : String;
+    IDSConnectSupportedProcesses : String;
+  end;
+  
   TOpenConnectHelper = class(TObject)
   public const
+    SHKCONNECT_VERSION = '2.0';
+  
     SHKCONNECT_SERVICE_ARGE  = 'https://arge20.shk-connect.de';
     SHKCONNECT_SERVICE_SHKGH = 'https://shkgh20.shk-connect.de';
     SHKCONNECT_SERVICE_OC    = 'https://o-connect.de';
@@ -80,6 +96,7 @@ type
     SHKCONNECT_SERVICE_PROC_AIA = '/services/AnwenderIndividuelleAuskuenfte';
   public
     class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
+    class function CheckIDSConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _IDSConnectivity : TOpenConnectIDSConnectivity) : Boolean;
   end;
 
 implementation
@@ -256,7 +273,7 @@ begin
 
   try
     bl_gb := GetBranchenListe.Create;
-    bl_gb.Schnittstellenversion := '2.0';
+    bl_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
     bl_gb.Softwarename := OPENCONNECT_LOGIN;
     bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
@@ -283,7 +300,7 @@ begin
 
   try
     bl_gb := GetBranchenListe.Create;
-    bl_gb.Schnittstellenversion := '2.0';
+    bl_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
     bl_gb.Softwarename := OPENCONNECT_LOGIN;
     bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
@@ -310,7 +327,7 @@ begin
 
   try
     bl_gb := GetBranchenListe.Create;
-    bl_gb.Schnittstellenversion := '2.0';
+    bl_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
     bl_gb.Softwarename := OPENCONNECT_LOGIN;
     bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
@@ -337,7 +354,7 @@ begin
 
   try
     aa_gb := GetAllgemeineAuskunft.Create;
-    aa_gb.Schnittstellenversion := '2.0';
+    aa_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
 
     aa_gb.Softwarename := OPENCONNECT_LOGIN;
     aa_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
@@ -428,6 +445,73 @@ begin
   end;
 
   Result := true;
+end;
+
+class function TOpenConnectHelper.CheckIDSConnectivitiy(_LoginOptions: TOpenConnectLoginOptions;
+  out _IDSConnectivity: TOpenConnectIDSConnectivity): Boolean;
+var
+  aia_gb : GetIndividuelleAuskunft;
+  aia_b : AnwenderIndividuelleAuskuenfteBean;
+  aia_resp : GetIndividuelleAuskunftAntwort;
+  aia_p : Prozess;
+  aia_tp : String;//Teilprozess
+begin
+  Result := false;
+
+  _IDSConnectivity.IDSConnectAvailable := false;
+  _IDSConnectivity.IDSConnectURL := '';
+  _IDSConnectivity.IDSConnectSupportedProcesses := '';
+
+  if _LoginOptions.CustomerNo.IsEmpty and _LoginOptions.Username.IsEmpty and _LoginOptions.Password.IsEmpty then
+    exit;
+  if _LoginOptions.ServiceURL.IsEmpty then
+    exit;
+  if _LoginOptions.SupplierID = 0 then
+    exit;
+  
+  aia_gb := GetIndividuelleAuskunft.Create;
+  try
+  try
+    aia_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
+    aia_gb.Softwarename := OPENCONNECT_LOGIN;
+    aia_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
+    aia_gb.UnternehmensID := _LoginOptions.SupplierID;
+    aia_gb.Kundennummer := _LoginOptions.CustomerNo;
+    aia_gb.Benutzername := _LoginOptions.Username;
+    aia_gb.Passwort := _LoginOptions.Password;
+
+    aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA);
+    aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
+
+    if aia_resp.Status.Code = '0' then
+    begin
+      //Besonderheiten
+      //Zander Freiburg bringt SHA zweimal hintereinander mit dem gleichen Inhalt, deswegen break
+    
+      for aia_p in aia_resp.Prozessliste do
+      if aia_p.Prozesscode = 'SHA' then
+      begin
+        _IDSConnectivity.IDSConnectAvailable := true;
+        _IDSConnectivity.IDSConnectURL := aia_p.URL;
+
+        for aia_tp in aia_p.Teilprozesse do
+          _IDSConnectivity.IDSConnectSupportedProcesses := Trim(_IDSConnectivity.IDSConnectSupportedProcesses+' '+aia_tp);
+
+        Result := true;
+        break;
+      end;
+    end else
+      //WideMessageDialog(_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung, mtError, [mbOK], 0);
+
+    aia_resp.Free;
+    aia_b := nil;
+
+  finally  
+    aia_gb.Free;
+  end;  
+  except
+//    On E:Exception do begin TLog.Log(true,P_ERROR,'GetAnwenderIndividuelleAuskuenfteBean',e); exit; end;
+  end;
 end;
 
 end.

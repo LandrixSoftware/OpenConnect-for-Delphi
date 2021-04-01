@@ -2,7 +2,7 @@
 
 # OpenConnect-for-Delphi
 
-SHKConnect / OpenConnect
+SHKConnect / OpenConnect 2.0
 
 Weitere Informationen unter https://www.itek.de/services/open-connect
 
