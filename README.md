@@ -6,6 +6,12 @@ SHKConnect / OpenConnect 2.0
 
 Weitere Informationen unter https://www.itek.de/services/open-connect
 
+Online-Dokumentation unter
+
+https://itek-branchenwissen.atlassian.net/wiki/spaces/DKB/pages/94535707/SHK+Connect
+
+https://itek-branchenwissen.atlassian.net/wiki/spaces/DKB/pages/94535722/Schnittstelle+Prozessnutzer+Handwerkssoftware
+
 # Lizenz / License
 
 english version below
