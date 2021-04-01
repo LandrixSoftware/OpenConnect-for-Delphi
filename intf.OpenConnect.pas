@@ -30,13 +30,13 @@ uses
 type
   TOpenConnectSupplier = class(TObject)
   public
-    ID:      Integer;
-    Name :   string ;
-    Street: string ;
-    Zip:     string ;
-    City:     string ;
-    Country:    string ;
-    ServiceURL : String;
+    ID        : Integer;
+    Name      : string;
+    Street    : string ;
+    Zip       : string ;
+    City      : string ;
+    Country   : string ;
+    ServiceURL: String;
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
@@ -357,7 +357,7 @@ begin
           supplierItm := _ResultList[i].Supplier.GetItemBySupplierID(aa_u.ID);
           supplierItm.Name := aa_u.Name_;
           supplierItm.Street := aa_u.Strasse;
-          supplierItm.zip := aa_u.PLZ;
+          supplierItm.Zip := aa_u.PLZ;
           supplierItm.City := aa_u.Ort;
           supplierItm.Country := aa_u.Land;
           supplierItm.ServiceURL := SHKCONNECT_SERVICE_ARGE;
