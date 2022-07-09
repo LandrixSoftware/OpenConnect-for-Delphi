@@ -10,11 +10,10 @@ object MainForm: TMainForm
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = False
   Position = poScreenCenter
+  OnClose = FormClose
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  PixelsPerInch = 96
   TextHeight = 13
   object ListView1: TListView
     Left = 0
@@ -108,7 +107,7 @@ object MainForm: TMainForm
       Height = 33
       Cursor = crHandPoint
       AutoSize = False
-      Caption = 'https://github.com/ LandrixSoftware/IDSConnect-for-Delphi'
+      Caption = 'https://github.com/LandrixSoftware/ IDSConnect-for-Delphi'
       Font.Charset = DEFAULT_CHARSET
       Font.Color = clBlue
       Font.Height = -11
@@ -176,6 +175,9 @@ object MainForm: TMainForm
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 2
+    DesignSize = (
+      1286
+      41)
     object Button1: TButton
       Left = 8
       Top = 6
@@ -184,6 +186,25 @@ object MainForm: TMainForm
       Caption = 'Anbieter laden'
       TabOrder = 0
       OnClick = Button1Click
+    end
+    object Button3: TButton
+      Left = 1196
+      Top = 6
+      Width = 75
+      Height = 25
+      Anchors = [akTop, akRight]
+      Caption = 'Beenden'
+      TabOrder = 1
+      OnClick = Button3Click
+    end
+    object CheckBox1: TCheckBox
+      Left = 1016
+      Top = 10
+      Width = 169
+      Height = 17
+      Anchors = [akTop, akRight]
+      Caption = 'Aenderungen nicht speichern'
+      TabOrder = 2
     end
   end
 end

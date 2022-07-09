@@ -30,6 +30,8 @@ type
     Edit5: TEdit;
     Label9: TLabel;
     Label10: TLabel;
+    Button3: TButton;
+    CheckBox1: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -37,6 +39,8 @@ type
     procedure ListView1SelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
     procedure Button2Click(Sender: TObject);
     procedure Label10Click(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure Button3Click(Sender: TObject);
   public
     Suppliers: TOpenConnectBusinessList;
     Configuration : TMemIniFile;
@@ -55,7 +59,12 @@ begin
   Suppliers:= TOpenConnectBusinessList.Create;
   Configuration := TMemIniFile.Create(ExtractFilePath(ExtractFileDir(ExtractFileDir(Application.ExeName)))+'configuration.ini');
   Editable := false;
-  
+
+  Left := 50;
+  Top := 50;
+  Width := Screen.DesktopWidth-100;
+  Height := Screen.DesktopHeight-100;
+
   with ListView1.Columns.Add do
   begin
     Caption := 'Service-Name';
@@ -117,11 +126,25 @@ begin
     Alignment := taLeftJustify;
     Width := 50;
   end;
+  for var i : Integer := 0 to ListView1.Columns.Count-1 do
+    ListView1.Columns[i].Width := Configuration.ReadInteger(ListView1.Name,i.ToString,ListView1.Columns[i].Width);
+end;
+
+procedure TMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  for var i : Integer := 0 to ListView1.Columns.Count-1 do
+    Configuration.WriteInteger(ListView1.Name,i.ToString,ListView1.Columns[i].Width);
 end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
-  if Assigned(Configuration) then begin Configuration.UpdateFile; Configuration.Free; Configuration := nil; end;
+  if Assigned(Configuration) then
+  begin
+    if not CheckBox1.Checked then
+      Configuration.UpdateFile;
+    Configuration.Free;
+    Configuration := nil;
+  end;
   if Assigned( Suppliers) then begin ListView1.Clear; Suppliers.Free;  Suppliers := nil; end;
 end;
 
@@ -153,7 +176,7 @@ begin
     SubItems.Add(Suppliers[i].Supplier[j].Zip);
     SubItems.Add(Suppliers[i].Supplier[j].City);
     SubItems.Add(Suppliers[i].Supplier[j].Country);
-    if Configuration.SectionExists(IntToStr(Suppliers[i].ID)+'-'+IntToStr(Suppliers[i].Supplier[j].ID)) then
+    if Configuration.SectionExists(Suppliers[i].ServiceURL+'-'+IntToStr(Suppliers[i].ID)+'-'+IntToStr(Suppliers[i].Supplier[j].ID)) then
       SubItems.Add('vorhanden')
     else
       SubItems.Add('');
@@ -163,17 +186,19 @@ end;
 procedure TMainForm.Edit3Change(Sender: TObject);
 var
   section : String;
+  i : Integer;
 begin
   if ListView1.Selected = nil then
     exit;
   if not Editable then
     exit;
-  section := ListView1.Selected.SubItems[0]+'-'+ListView1.Selected.SubItems[3];
-  if Trim(Edit1.Text).IsEmpty and Trim(Edit2.Text).IsEmpty and Trim(Edit3.Text).IsEmpty and 
-     Trim(Edit4.Text).IsEmpty and Trim(Edit5.Text).IsEmpty  then
-  begin   
+
+  section := ListView1.Selected.SubItems[1]+'-'+ListView1.Selected.SubItems[0]+'-'+ListView1.Selected.SubItems[3];
+
+  if //Trim(Edit1.Text).IsEmpty and Trim(Edit2.Text).IsEmpty and
+     Trim(Edit3.Text).IsEmpty and Trim(Edit4.Text).IsEmpty and Trim(Edit5.Text).IsEmpty  then
+  begin
     Configuration.EraseSection(section);
-    ListView1.Selected.SubItems[ListView1.Selected.SubItems.Count-1] := '';
   end else
   begin
     Configuration.WriteString(section,'idsconnectprocesses',Edit1.Text);
@@ -181,8 +206,15 @@ begin
     Configuration.WriteString(section,'customerno',Edit3.Text);
     Configuration.WriteString(section,'username',Edit4.Text);
     Configuration.WriteString(section,'password',Edit5.Text);
-    ListView1.Selected.SubItems[ListView1.Selected.SubItems.Count-1] := 'vorhanden';
   end;
+
+  for i := 0 to ListView1.Items.Count-1 do
+  if Configuration.SectionExists(ListView1.Items[i].SubItems[1]+'-'+ListView1.Items[i].SubItems[0]+'-'+ListView1.Items[i].SubItems[3]) then
+    ListView1.Items[i].SubItems[ListView1.Selected.SubItems.Count-1] := 'vorhanden'
+  else
+    ListView1.Items[i].SubItems[ListView1.Selected.SubItems.Count-1] := '';
+
+
 end;
 
 procedure TMainForm.ListView1SelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
@@ -195,7 +227,7 @@ begin
     exit;
   Editable := false;
   try
-    section := Item.SubItems[0]+'-'+Item.SubItems[3];
+    section := Item.SubItems[1]+'-'+Item.SubItems[0]+'-'+Item.SubItems[3];
     Edit1.Text := Configuration.ReadString(section,'idsconnectprocesses','');
     Edit2.Text := Configuration.ReadString(section,'idsconnecturl','');
     Edit3.Text := Configuration.ReadString(section,'customerno','');
@@ -242,6 +274,11 @@ begin
   finally
     Screen.Cursor := crDefault;
   end;
+end;
+
+procedure TMainForm.Button3Click(Sender: TObject);
+begin
+  Close;
 end;
 
 procedure TMainForm.Label10Click(Sender: TObject);

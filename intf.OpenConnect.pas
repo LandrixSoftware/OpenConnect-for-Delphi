@@ -32,11 +32,14 @@ type
   public
     ID        : Integer;
     Name      : string;
-    Street    : string ;
-    Zip       : string ;
-    City      : string ;
-    Country   : string ;
+    Street    : string;
+    Zip       : string;
+    City      : string;
+    Country   : string;
     ServiceURL: String;
+    CustomerNumberRequired : Boolean;
+    UsernameRequired : Boolean;
+    PasswordRequired : Boolean;
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
@@ -119,6 +122,9 @@ begin
   _Dest.City :=  City;
   _Dest.Country :=  Country;
   _Dest.ServiceURL := ServiceURL;
+  _Dest.CustomerNumberRequired := CustomerNumberRequired;
+  _Dest.UsernameRequired := UsernameRequired;
+  _Dest.PasswordRequired := PasswordRequired;
 end;
 
 procedure TOpenConnectSupplier.Clear;
@@ -130,6 +136,9 @@ begin
   City := '';
   Country := '';
   ServiceURL := '';
+  CustomerNumberRequired := false;
+  UsernameRequired := false;
+  PasswordRequired := false;
 end;
 
 function TOpenConnectSupplier.Duplicate: TOpenConnectSupplier;
@@ -364,7 +373,7 @@ begin
       aa_gb.BrancheID := IntToStr(_ResultList[i].ID);
 
       try
-      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_PROC_AA);
+      aa_b := GetAllgemeineAuskuenfteBean(false,_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA);
       aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
 
       if aa_resp.Status.Code = '0' then
@@ -377,7 +386,10 @@ begin
           supplierItm.Zip := aa_u.PLZ;
           supplierItm.City := aa_u.Ort;
           supplierItm.Country := aa_u.Land;
-          supplierItm.ServiceURL := SHKCONNECT_SERVICE_ARGE;
+          supplierItm.ServiceURL := _ResultList[i].ServiceURL;
+          supplierItm.CustomerNumberRequired := aa_u.Kundennummer_erforderlich;
+          supplierItm.UsernameRequired := aa_u.Benutzername_erforderlich;
+          supplierItm.PasswordRequired := aa_u.Passwort_erforderlich;
         end;
       end;// else
         //WideMessageDialog(SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_AA+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
@@ -386,56 +398,6 @@ begin
       aa_b := nil;
       except
         //On E:Exception do begin TLog.Log(true,P_ERROR,'GetAllgemeineAuskuenfteBean '+SHKCONNECT_SERVICE_ARGE,e); exit; end;
-      end;
-
-      try
-      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_PROC_AA);
-      aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
-
-      if aa_resp.Status.Code = '0' then
-      begin
-        for aa_u in aa_resp.Unternehmen do
-        begin
-          supplierItm := _ResultList[i].Supplier.GetItemBySupplierID(aa_u.ID);
-          supplierItm.Name := aa_u.Name_;
-          supplierItm.Street := aa_u.Strasse;
-          supplierItm.zip := aa_u.PLZ;
-          supplierItm.City := aa_u.Ort;
-          supplierItm.Country := aa_u.Land;
-          supplierItm.ServiceURL := SHKCONNECT_SERVICE_SHKGH;
-        end;
-      end;// else
-        //WideMessageDialog(SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_AA+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
-
-      aa_resp.Free;
-      aa_b := nil;
-      except
-//        On E:Exception do begin TLog.Log(true,P_ERROR,'GetAllgemeineAuskuenfteBean '+SHKCONNECT_SERVICE_SHKGH,e); exit; end;
-      end;
-
-      try
-      aa_b := GetAllgemeineAuskuenfteBean(false,SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_PROC_AA);
-      aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
-
-      if aa_resp.Status.Code = '0' then
-      begin
-        for aa_u in aa_resp.Unternehmen do
-        begin
-          supplierItm := _ResultList[i].Supplier.GetItemBySupplierID(aa_u.ID);
-          supplierItm.Name := aa_u.Name_;
-          supplierItm.Street := aa_u.Strasse;
-          supplierItm.zip := aa_u.PLZ;
-          supplierItm.City := aa_u.Ort;
-          supplierItm.Country := aa_u.Land;
-          supplierItm.ServiceURL := SHKCONNECT_SERVICE_OC;
-        end;
-      end;// else
-        //WideMessageDialog(SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_AA+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
-
-      aa_resp.Free;
-      aa_b := nil;
-      except
-//        On E:Exception do begin TLog.Log(true,P_ERROR,'GetAllgemeineAuskuenfteBean '+SHKCONNECT_SERVICE_OC,e); exit; end;
       end;
     end;
 

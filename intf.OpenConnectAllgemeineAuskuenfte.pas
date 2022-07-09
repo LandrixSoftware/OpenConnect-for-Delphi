@@ -6,7 +6,7 @@
 //  >Import : https://shkgh20.shk-connect.de/services/AllgemeineAuskuenfte?wsdl>0
 // Codierung : UTF-8
 // Version: 1.0
-// (02.11.2020 22:45:08 - - $Rev: 101104 $)
+// (08.07.2022 15:45:37 - - $Rev: 108085 $)
 // ************************************************************************ //
 
 unit intf.OpenConnectAllgemeineAuskuenfte;
