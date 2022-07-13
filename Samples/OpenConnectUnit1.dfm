@@ -2,7 +2,7 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'OpenConnect for Delphi'
-  ClientHeight = 636
+  ClientHeight = 682
   ClientWidth = 1286
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -19,7 +19,7 @@ object MainForm: TMainForm
     Left = 0
     Top = 0
     Width = 1024
-    Height = 595
+    Height = 641
     Align = alClient
     Columns = <>
     GridLines = True
@@ -33,7 +33,7 @@ object MainForm: TMainForm
     Left = 1024
     Top = 0
     Width = 262
-    Height = 595
+    Height = 641
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 1
@@ -46,28 +46,28 @@ object MainForm: TMainForm
     end
     object Label6: TLabel
       Left = 17
-      Top = 169
+      Top = 201
       Width = 200
       Height = 13
       Caption = 'IDSConnect-Unterstuetzung (Onlineshop)'
     end
     object Label7: TLabel
       Left = 17
-      Top = 185
+      Top = 217
       Width = 31
       Height = 13
       Caption = 'Label1'
     end
     object Label4: TLabel
       Left = 17
-      Top = 206
+      Top = 238
       Width = 173
       Height = 13
       Caption = 'Unterstuetzte IDSConnect Prozesse'
     end
     object Label5: TLabel
       Left = 17
-      Top = 248
+      Top = 280
       Width = 79
       Height = 13
       Caption = 'IDSConnect URL'
@@ -95,14 +95,14 @@ object MainForm: TMainForm
     end
     object Label9: TLabel
       Left = 17
-      Top = 304
+      Top = 336
       Width = 149
       Height = 13
       Caption = 'Naeheres zu IDSConnect unter'
     end
     object Label10: TLabel
       Left = 17
-      Top = 320
+      Top = 352
       Width = 230
       Height = 33
       Cursor = crHandPoint
@@ -117,6 +117,62 @@ object MainForm: TMainForm
       WordWrap = True
       OnClick = Label10Click
     end
+    object Label11: TLabel
+      Left = 17
+      Top = 149
+      Width = 160
+      Height = 13
+      Caption = 'Datanorm-Online-Unterstuetzung'
+    end
+    object Label12: TLabel
+      Left = 17
+      Top = 165
+      Width = 31
+      Height = 13
+      Caption = 'Label1'
+    end
+    object Label13: TLabel
+      Left = 17
+      Top = 405
+      Width = 163
+      Height = 13
+      Caption = 'Open Masterdata-Unterstuetzung'
+    end
+    object Label14: TLabel
+      Left = 17
+      Top = 421
+      Width = 31
+      Height = 13
+      Caption = 'Label1'
+    end
+    object Label15: TLabel
+      Left = 17
+      Top = 440
+      Width = 45
+      Height = 13
+      Caption = 'Auth URL'
+    end
+    object Label16: TLabel
+      Left = 17
+      Top = 480
+      Width = 89
+      Height = 13
+      Caption = 'bySupplierPID URL'
+    end
+    object Label17: TLabel
+      Left = 17
+      Top = 520
+      Width = 122
+      Height = 13
+      Caption = 'byManufacturerData URL'
+    end
+    object Label18: TLabel
+      Left = 17
+      Top = 560
+      Width = 58
+      Height = 13
+      Caption = 'byGTIN URL'
+    end
     object Button2: TButton
       Left = 128
       Top = 118
@@ -128,7 +184,7 @@ object MainForm: TMainForm
     end
     object Edit1: TEdit
       Left = 17
-      Top = 222
+      Top = 254
       Width = 232
       Height = 21
       TabOrder = 1
@@ -136,7 +192,7 @@ object MainForm: TMainForm
     end
     object Edit2: TEdit
       Left = 17
-      Top = 264
+      Top = 296
       Width = 232
       Height = 21
       TabOrder = 2
@@ -166,10 +222,42 @@ object MainForm: TMainForm
       TabOrder = 5
       OnChange = Edit3Change
     end
+    object Edit6: TEdit
+      Left = 17
+      Top = 456
+      Width = 232
+      Height = 21
+      TabOrder = 6
+      OnChange = Edit3Change
+    end
+    object Edit7: TEdit
+      Left = 17
+      Top = 496
+      Width = 232
+      Height = 21
+      TabOrder = 7
+      OnChange = Edit3Change
+    end
+    object Edit8: TEdit
+      Left = 17
+      Top = 536
+      Width = 232
+      Height = 21
+      TabOrder = 8
+      OnChange = Edit3Change
+    end
+    object Edit9: TEdit
+      Left = 17
+      Top = 576
+      Width = 232
+      Height = 21
+      TabOrder = 9
+      OnChange = Edit3Change
+    end
   end
   object Panel2: TPanel
     Left = 0
-    Top = 595
+    Top = 641
     Width = 1286
     Height = 41
     Align = alBottom

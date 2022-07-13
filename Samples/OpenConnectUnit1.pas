@@ -32,6 +32,18 @@ type
     Label10: TLabel;
     Button3: TButton;
     CheckBox1: TCheckBox;
+    Label11: TLabel;
+    Label12: TLabel;
+    Label13: TLabel;
+    Label14: TLabel;
+    Label15: TLabel;
+    Edit6: TEdit;
+    Edit7: TEdit;
+    Label16: TLabel;
+    Edit8: TEdit;
+    Label17: TLabel;
+    Edit9: TEdit;
+    Label18: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -62,8 +74,8 @@ begin
 
   Left := 50;
   Top := 50;
-  Width := Screen.DesktopWidth-100;
-  Height := Screen.DesktopHeight-100;
+  Width := Screen.WorkAreaWidth-100;
+  Height := Screen.WorkAreaHeight-100;
 
   with ListView1.Columns.Add do
   begin
@@ -241,8 +253,18 @@ end;
 procedure TMainForm.Button2Click(Sender: TObject);
 var
   loginOptions : TOpenConnectLoginOptions;
-  IDSConnectivity: TOpenConnectIDSConnectivity;
+  connectivity: TOpenConnectConnectivityOptions;
 begin
+  Label12.Caption := '';
+  Label7.Caption := '';
+  Edit1.Text := '';
+  Edit2.Text := '';
+  Label14.Caption := '';
+  Edit6.Text := '';
+  Edit7.Text := '';
+  Edit8.Text := '';
+  Edit9.Text := '';
+
   if ListView1.Selected = nil then
     exit;
 
@@ -251,26 +273,49 @@ begin
   loginOptions.Password := Edit5.Text;
   loginOptions.ServiceURL := ListView1.Selected.SubItems[1];
   loginOptions.SupplierID := StrToInt(ListView1.Selected.SubItems[3]);
-    
+
   Screen.Cursor := crHourGlass;
   try
-    if not TOpenConnectHelper.CheckIDSConnectivitiy(loginOptions,IDSConnectivity) then
+    if not TOpenConnectHelper.CheckConnectivitiy(loginOptions,connectivity) then
       exit;
-    if IDSConnectivity.IDSConnectAvailable then
+
+    if connectivity.DatanormOnlineAvailable then
+      Label12.Caption := 'verfuegbar'
+    else
+      Label12.Caption := 'nicht verfuegbar';
+
+    if connectivity.IDSConnectAvailable then
       Label7.Caption := 'verfuegbar'
     else
       Label7.Caption := 'nicht verfuegbar';
 
-    Edit1.Text := IDSConnectivity.IDSConnectSupportedProcesses;
+    Edit1.Text := connectivity.IDSConnectSupportedProcesses;
 
     if Edit2.Text <> '' then
-    if not SameText(Edit2.Text,IDSConnectivity.IDSConnectURL) then
-    if (MessageDlg('Die IDSConnect-ServiceURL hat sich geaendert.'+#10+
-        'Soll die neue URL eingetragen werden?'+#10+
-        IDSConnectivity.IDSConnectURL, mtWarning, [mbYes, mbNo], 0) = mrNo) then
-      exit;
-    
-    Edit2.Text := IDSConnectivity.IDSConnectURL;
+    begin
+      if not SameText(Edit2.Text,connectivity.IDSConnectURL) then
+      if (MessageDlg('Die IDSConnect-ServiceURL hat sich geaendert.'+#10+
+          'Soll die neue URL eingetragen werden?'+#10+
+          'Alt: '+Edit2.Text+#10+
+          'Neu: '+connectivity.IDSConnectURL, mtWarning, [mbYes, mbNo], 0) = mrYes) then
+        Edit2.Text := connectivity.IDSConnectURL;
+    end else
+      Edit2.Text := connectivity.IDSConnectURL;
+
+    if connectivity.OpenMasterdataAvailable then
+    begin
+      Label14.Caption := 'verfuegbar';
+      if connectivity.OpenMasterdata_OAuthCustomernumberRequired then
+        Label14.Caption := Label14.Caption +' +CNr';
+      if connectivity.OpenMasterdata_OAuthUsernameRequired then
+        Label14.Caption := Label14.Caption +' +UN';
+    end else
+      Label14.Caption := 'nicht verfuegbar';
+    Edit6.Text := connectivity.OpenMasterdata_OAuthURL;
+    Edit7.Text := connectivity.OpenMasterdata_bySupplierPIDURL;
+    Edit8.Text := connectivity.OpenMasterdata_byManufacturerDataURL;
+    Edit9.Text := connectivity.OpenMasterdata_byGTINURL;
+
   finally
     Screen.Cursor := crDefault;
   end;

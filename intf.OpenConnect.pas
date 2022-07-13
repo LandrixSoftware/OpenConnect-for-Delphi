@@ -80,10 +80,23 @@ type
     ServiceURL : String;
   end;
 
-  TOpenConnectIDSConnectivity = record
+  TOpenConnectConnectivityOptions = record
+    DatanormOnlineAvailable : Boolean;
     IDSConnectAvailable : Boolean;
     IDSConnectURL : String;
     IDSConnectSupportedProcesses : String;
+    OpenMasterdataAvailable : Boolean;
+    OpenMasterdata_OAuthURL : String;
+    OpenMasterdata_OAuthCustomernumberRequired : Boolean;
+    OpenMasterdata_OAuthUsernameRequired : Boolean;
+    OpenMasterdata_bySupplierPIDURL : String;
+    OpenMasterdata_byManufacturerDataURL : String;
+    OpenMasterdata_byGTINURL : String;
+  public
+    procedure Clear;
+    function Support_IDSConnectWKEProcess : Boolean;
+    function Support_IDSConnectWKSProcess : Boolean;
+    function Support_IDSConnectADLProcess : Boolean;
   end;
   
   TOpenConnectHelper = class(TObject)
@@ -99,7 +112,7 @@ type
     SHKCONNECT_SERVICE_PROC_AIA = '/services/AnwenderIndividuelleAuskuenfte';
   public
     class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
-    class function CheckIDSConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _IDSConnectivity : TOpenConnectIDSConnectivity) : Boolean;
+    class function CheckConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _Connectivity : TOpenConnectConnectivityOptions) : Boolean;
   end;
 
 implementation
@@ -409,8 +422,8 @@ begin
   Result := true;
 end;
 
-class function TOpenConnectHelper.CheckIDSConnectivitiy(_LoginOptions: TOpenConnectLoginOptions;
-  out _IDSConnectivity: TOpenConnectIDSConnectivity): Boolean;
+class function TOpenConnectHelper.CheckConnectivitiy(_LoginOptions: TOpenConnectLoginOptions;
+  out _Connectivity : TOpenConnectConnectivityOptions): Boolean;
 var
   aia_gb : GetIndividuelleAuskunft;
   aia_b : AnwenderIndividuelleAuskuenfteBean;
@@ -420,9 +433,7 @@ var
 begin
   Result := false;
 
-  _IDSConnectivity.IDSConnectAvailable := false;
-  _IDSConnectivity.IDSConnectURL := '';
-  _IDSConnectivity.IDSConnectSupportedProcesses := '';
+  _Connectivity.Clear;
 
   if _LoginOptions.CustomerNo.IsEmpty and _LoginOptions.Username.IsEmpty and _LoginOptions.Password.IsEmpty then
     exit;
@@ -447,33 +458,100 @@ begin
 
     if aia_resp.Status.Code = '0' then
     begin
-      //Besonderheiten
-      //Zander Freiburg bringt SHA zweimal hintereinander mit dem gleichen Inhalt, deswegen break
-    
       for aia_p in aia_resp.Prozessliste do
-      if aia_p.Prozesscode = 'SHA' then
-      begin
-        _IDSConnectivity.IDSConnectAvailable := true;
-        _IDSConnectivity.IDSConnectURL := aia_p.URL;
+        if SameText(aia_p.Prozesscode,'STD') then
+        begin
+          _Connectivity.DatanormOnlineAvailable := true;
+        end else
+        if SameText(aia_p.Prozesscode,'SHA') then
+        begin
+          //Viele liefern mehrere SHA, je nachdem, welche IDS-Connect-Version
+          //unterstützt werden. Allerdings geben sie keine Versionsnummer an
+          _Connectivity.IDSConnectAvailable := true;
+          _Connectivity.IDSConnectURL := aia_p.URL;
 
-        for aia_tp in aia_p.Teilprozesse do
-          _IDSConnectivity.IDSConnectSupportedProcesses := Trim(_IDSConnectivity.IDSConnectSupportedProcesses+' '+aia_tp);
-
-        Result := true;
-        break;
-      end;
+          for aia_tp in aia_p.Teilprozesse do
+          if Pos(aia_tp,_Connectivity.IDSConnectSupportedProcesses) = 0 then
+            _Connectivity.IDSConnectSupportedProcesses := Trim(_Connectivity.IDSConnectSupportedProcesses+' '+aia_tp);
+        end else
+        if SameText(aia_p.Prozesscode,'OMD-oauth') then
+        begin
+          _Connectivity.OpenMasterdataAvailable := true;
+          _Connectivity.OpenMasterdata_OAuthURL := aia_p.URL;
+          for aia_tp in aia_p.Teilprozesse do
+          if SameText(aia_tp,'OMD-oauth-Username') then
+            _Connectivity.OpenMasterdata_OAuthUsernameRequired := true
+          else
+          if SameText(aia_tp,'OMD-oauth-Customernumber') then
+            _Connectivity.OpenMasterdata_OAuthCustomernumberRequired := true
+        end else
+        if SameText(aia_p.Prozesscode,'OMD-1-0-5-bySupplierPID') then
+        begin
+          _Connectivity.OpenMasterdata_bySupplierPIDURL := aia_p.URL;
+        end else
+        if SameText(aia_p.Prozesscode,'OMD-1-0-5-byManufacturerDataURL') then
+        begin
+          _Connectivity.OpenMasterdata_byManufacturerDataURL := aia_p.URL;
+        end else
+        if SameText(aia_p.Prozesscode,'OMD-1-0-5-byGTINURL') then
+        begin
+          _Connectivity.OpenMasterdata_byGTINURL := aia_p.URL;
+        end;
+      Result := true;
     end else
       //WideMessageDialog(_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung, mtError, [mbOK], 0);
+
 
     aia_resp.Free;
     aia_b := nil;
 
-  finally  
+  finally
     aia_gb.Free;
-  end;  
+  end;
   except
 //    On E:Exception do begin TLog.Log(true,P_ERROR,'GetAnwenderIndividuelleAuskuenfteBean',e); exit; end;
   end;
+end;
+
+{ TOpenConnectConnectivityOptions }
+
+procedure TOpenConnectConnectivityOptions.Clear;
+begin
+  DatanormOnlineAvailable := false;
+  IDSConnectAvailable := false;
+  IDSConnectURL := '';
+  IDSConnectSupportedProcesses := '';
+  OpenMasterdataAvailable := false;
+  OpenMasterdata_OAuthURL := '';
+  OpenMasterdata_OAuthCustomernumberRequired := false;
+  OpenMasterdata_OAuthUsernameRequired := false;
+  OpenMasterdata_bySupplierPIDURL := '';
+  OpenMasterdata_byManufacturerDataURL := '';
+  OpenMasterdata_byGTINURL := '';
+end;
+
+function TOpenConnectConnectivityOptions.Support_IDSConnectADLProcess: Boolean;
+begin
+  Result := false;
+  if not IDSConnectAvailable then
+    exit;
+  Result := Pos('ADL',IDSConnectSupportedProcesses.ToUpper)>0;
+end;
+
+function TOpenConnectConnectivityOptions.Support_IDSConnectWKEProcess: Boolean;
+begin
+  Result := false;
+  if not IDSConnectAvailable then
+    exit;
+  Result := Pos('WKE',IDSConnectSupportedProcesses.ToUpper)>0;
+end;
+
+function TOpenConnectConnectivityOptions.Support_IDSConnectWKSProcess: Boolean;
+begin
+  Result := false;
+  if not IDSConnectAvailable then
+    exit;
+  Result := Pos('WKS',IDSConnectSupportedProcesses.ToUpper)>0;
 end;
 
 end.
