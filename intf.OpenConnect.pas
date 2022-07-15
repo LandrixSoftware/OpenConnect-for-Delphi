@@ -1,7 +1,7 @@
 {
 License OpenConnect-for-Delphi
 
-Copyright (C) 2021 Landrix Software GmbH & Co. KG
+Copyright (C) 2022 Landrix Software GmbH & Co. KG
 Sven Harazim, info@landrix.de
 
 This program is free software: you can redistribute it and/or modify
@@ -24,7 +24,8 @@ interface
 
 uses
   System.SysUtils, System.Classes,System.StrUtils,Vcl.Controls,
-  System.Contnrs,Vcl.Dialogs,Vcl.Forms,System.IOUTils, System.Generics.Collections
+  System.Contnrs,Vcl.Dialogs,Vcl.Forms,System.IOUTils,
+  System.Generics.Collections, System.UITypes
   ;
 
 type
@@ -113,6 +114,7 @@ type
   public
     class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
     class function CheckConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _Connectivity : TOpenConnectConnectivityOptions) : Boolean;
+    class function GetErrorCodeAsString(_ErrorNumber : Integer) : String;
   end;
 
 implementation
@@ -271,6 +273,23 @@ end;
 
 { TOpenConnectHelper }
 
+class function TOpenConnectHelper.GetErrorCodeAsString(
+  _ErrorNumber: Integer): String;
+begin
+  case _ErrorNumber of
+    1 : Result := 'Fehler bei der Authentifizierung der anfragenden Software.';
+    2 : Result := 'Der angefragte Prozess existiert nicht im SHK Connect Server.';
+    3 : Result := 'Das angefragte Unternehmen existiert nicht im SHK Connect Server.';
+    4 : Result := 'Fehler bei der Authentifizierung des Anwenders beim Unternehmen.';
+    5 : Result := 'Angefragte Branche existiert nicht.';
+    6 : Result := 'Angefragte PLZ aus der Umkreissuche existiert nicht.';
+    7 : Result := 'Fehler bei der Kommunikation mit dem angefragten Unternehmen.';
+    9 : Result := 'Fehlerhafte Anfrage (z.B. Pflichtfelder in der Anfrage fehlen)';
+    10 : Result := 'Testantwort';
+    else Result := 'Es ist kein Fehler aufgetreten.';
+  end;
+end;
+
 class function TOpenConnectHelper.GetSupplierList(_ResultList: TOpenConnectBusinessList): Boolean;
 var
   bl_gb : GetBranchenListe;
@@ -309,8 +328,8 @@ begin
         businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_ARGE,true);
         businessItm.Description := bl_br.Name_;
       end;
-    end;// else
-      //WideMessageDialog(SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
+    end else
+      MessageDlg(SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_PROC_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
 
     bl_resp.Free;
     bl_b := nil;
@@ -336,8 +355,8 @@ begin
         businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_SHKGH,true);
         businessItm.Description := bl_br.Name_;
       end;
-    end;// else
-      //WideMessageDialog(SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
+    end else
+      MessageDlg(SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_PROC_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
 
     bl_resp.Free;
     bl_b := nil;
@@ -363,8 +382,8 @@ begin
         businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_OC,true);
         businessItm.Description := bl_br.Name_;
       end;
-    end;// else
-      //WideMessageDialog(SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
+    end else
+      MessageDlg(SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_PROC_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
 
     bl_resp.Free;
     bl_b := nil;
@@ -404,8 +423,8 @@ begin
           supplierItm.UsernameRequired := aa_u.Benutzername_erforderlich;
           supplierItm.PasswordRequired := aa_u.Passwort_erforderlich;
         end;
-      end;// else
-        //WideMessageDialog(SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_AA+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
+      end else
+        MessageDlg(_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA+#10+aa_resp.Status.Meldung, mtError, [mbOK], 0);
 
       aa_resp.Free;
       aa_b := nil;
@@ -441,7 +460,7 @@ begin
     exit;
   if _LoginOptions.SupplierID = 0 then
     exit;
-  
+
   aia_gb := GetIndividuelleAuskunft.Create;
   try
   try
@@ -499,8 +518,7 @@ begin
         end;
       Result := true;
     end else
-      //WideMessageDialog(_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung, mtError, [mbOK], 0);
-
+      MessageDlg(_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung, mtError, [mbOK], 0);
 
     aia_resp.Free;
     aia_b := nil;

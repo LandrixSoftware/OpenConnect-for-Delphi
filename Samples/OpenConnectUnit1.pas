@@ -67,9 +67,19 @@ implementation
 {$R *.dfm}
 
 procedure TMainForm.FormCreate(Sender: TObject);
+var
+  configurationFilename : String;
 begin
   Suppliers:= TOpenConnectBusinessList.Create;
-  Configuration := TMemIniFile.Create(ExtractFilePath(ExtractFileDir(ExtractFileDir(Application.ExeName)))+'configuration.ini');
+
+  if (Pos('Samples\Win32',Application.ExeName)>0) or (Pos('Samples\Win64',Application.ExeName)>0) then
+    configurationFilename := ExtractFilePath(ExtractFileDir(ExtractFileDir(Application.ExeName)))
+  else
+    configurationFilename := ExtractFilePath(Application.ExeName);
+
+  configurationFilename := configurationFilename + 'configuration.ini';
+
+  Configuration := TMemIniFile.Create(configurationFilename);
   Editable := false;
 
   Left := 50;
