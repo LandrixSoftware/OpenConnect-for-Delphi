@@ -99,7 +99,29 @@ type
     function Support_IDSConnectWKSProcess : Boolean;
     function Support_IDSConnectADLProcess : Boolean;
   end;
-  
+
+  TOpenConnectDatanormFile = class
+  public
+    Text : String;
+    FileID : Cardinal;
+    FileURL : String;
+    FileSize : Cardinal;
+    FileName : String;
+    FileDate : TDateTime;
+    HttpAuthActiv    : Boolean;
+    HttpAuthUsername : String;
+    HttpAuthPassword : String;
+    CookieActiv : Boolean;
+    Cookie : TStringList;
+  public
+    procedure Clear;
+    constructor Create;
+    destructor Destroy; override;
+  end;
+
+  TOpenConnectDatanormFileList = class(TObjectList<TOpenConnectDatanormFile>)
+  end;
+
   TOpenConnectHelper = class(TObject)
   public const
     SHKCONNECT_VERSION = '2.0';
@@ -113,6 +135,7 @@ type
     SHKCONNECT_SERVICE_PROC_AIA = '/services/AnwenderIndividuelleAuskuenfte';
   public
     class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
+    class function GetDatanormFileList(_LoginOptions : TOpenConnectLoginOptions; _ResultList : TOpenConnectDatanormFileList) : Boolean;
     class function CheckConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _Connectivity : TOpenConnectConnectivityOptions) : Boolean;
     class function GetErrorCodeAsString(_ErrorNumber : Integer) : String;
   end;
@@ -272,6 +295,91 @@ begin
 end;
 
 { TOpenConnectHelper }
+
+class function TOpenConnectHelper.GetDatanormFileList(
+  _LoginOptions: TOpenConnectLoginOptions;
+  _ResultList: TOpenConnectDatanormFileList): Boolean;
+var
+  aia_gb : GetIndividuelleAuskunft;
+  aia_b : AnwenderIndividuelleAuskuenfteBean;
+  aia_resp : GetIndividuelleAuskunftAntwort;
+  aia_p : Prozess;
+  aia_l : Link;
+  aia_c : String;//Cookie;
+  serviceURL : String;
+  dof : TOpenConnectDatanormFile;
+begin
+  Result := false;
+
+  if _ResultList = nil then
+    exit;
+
+  try
+    serviceURL := _LoginOptions.ServiceURL;
+    if String.StartsText('http://',serviceURL) then
+      serviceURL := serviceURL.Insert(4,'s');
+
+    aia_gb := GetIndividuelleAuskunft.Create;
+    aia_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
+    aia_gb.Softwarename := OPENCONNECT_LOGIN;
+    aia_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
+    aia_gb.UnternehmensID := _LoginOptions.SupplierID;
+    aia_gb.Kundennummer := _LoginOptions.CustomerNo;
+    aia_gb.Benutzername := _LoginOptions.Username;
+    aia_gb.Passwort := _LoginOptions.Password;
+
+    aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,serviceURL+SHKCONNECT_SERVICE_PROC_AIA);
+    aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
+
+    if aia_resp.Status.Code = '0' then
+    begin
+      for aia_p in aia_resp.Prozessliste do
+      if (aia_p.Prozesscode = 'STD') then
+      begin
+        for aia_l in aia_p.Link do
+        begin
+          dof := TOpenConnectDatanormFile.Create;
+          _ResultList.Add(dof);
+          dof.Text := aia_l.Beschreibung + ' '+aia_l.AenderungsInfo;
+          //dof.FileID := aia_l.Beschreibung;
+          dof.FileURL := aia_l.URL;
+          dof.FileDate := StrToDateDef(aia_l.DatenDatum,0);//aia_l.Datum,0);
+          dof.FileSize := aia_l.Groesse;
+          if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.HTTPAUTH then
+          begin
+            dof.HttpAuthActiv := true;
+            dof.HttpAuthUsername := _LoginOptions.Username;
+            dof.HttpAuthPassword := _LoginOptions.Password;
+          end
+          else
+          if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.URL then
+          begin
+            dof.HttpAuthActiv := false;
+          end
+          else
+          if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.COOKIE then
+          begin
+            for aia_c in aia_l.CookieList do
+            begin
+              dof.Cookie.Add(aia_c);
+            end;
+            //URL, , KEINE,
+          end;
+        end;
+      end;
+      //_ResultList.SortByDate;
+      Result := true;
+    end else
+      MessageDlg(serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung, mtError, [mbOK], 0);
+
+    aia_resp.Free;
+    aia_b := nil;
+
+    aia_gb.Free;
+  except
+    on E:Exception do begin MessageDlg('GetAnwenderIndividuelleAuskuenfteBean'+#10+e.Message+' '+e.ClassName, mtError, [mbOK], 0);; exit; end;
+  end;
+end;
 
 class function TOpenConnectHelper.GetErrorCodeAsString(
   _ErrorNumber: Integer): String;
@@ -570,6 +678,35 @@ begin
   if not IDSConnectAvailable then
     exit;
   Result := Pos('WKS',IDSConnectSupportedProcesses.ToUpper)>0;
+end;
+
+{ TOpenConnectDatanormFile }
+
+constructor TOpenConnectDatanormFile.Create;
+begin
+  Cookie := TStringList.Create;
+  Clear;
+end;
+
+destructor TOpenConnectDatanormFile.Destroy;
+begin
+  if Assigned(Cookie) then begin Cookie.Free; Cookie := nil; end;
+  inherited;
+end;
+
+procedure TOpenConnectDatanormFile.Clear;
+begin
+  FileID := 0;
+  FileURL := '';
+  FileSize := 0;
+  FileName := '';
+  FileDate := 0;
+  Text := '';
+  HttpAuthActiv := false;
+  HttpAuthUsername := '';
+  HttpAuthPassword := '';
+  CookieActiv := false;
+  Cookie.Clear;
 end;
 
 end.
