@@ -254,6 +254,15 @@ object MainForm: TMainForm
       TabOrder = 9
       OnChange = Edit3Change
     end
+    object Button4: TButton
+      Left = 16
+      Top = 603
+      Width = 235
+      Height = 25
+      Caption = 'Kopiere Konfiguration in die Zwischenablage'
+      TabOrder = 10
+      OnClick = Button4Click
+    end
   end
   object Panel2: TPanel
     Left = 0

@@ -90,6 +90,7 @@ type
     OpenMasterdata_OAuthURL : String;
     OpenMasterdata_OAuthCustomernumberRequired : Boolean;
     OpenMasterdata_OAuthUsernameRequired : Boolean;
+    OpenMasterdata_OAuthClientSecretRequired : Boolean;
     OpenMasterdata_bySupplierPIDURL : String;
     OpenMasterdata_byManufacturerDataURL : String;
     OpenMasterdata_byGTINURL : String;
@@ -611,6 +612,9 @@ begin
           else
           if SameText(aia_tp,'OMD-oauth-Customernumber') then
             _Connectivity.OpenMasterdata_OAuthCustomernumberRequired := true
+          else
+          if SameText(aia_tp,'OMD-oauth-ClientSecret') then
+            _Connectivity.OpenMasterdata_OAuthClientSecretRequired := true;
         end else
         if SameText(aia_p.Prozesscode,'OMD-1-0-5-bySupplierPID') then
         begin
@@ -651,6 +655,7 @@ begin
   OpenMasterdata_OAuthURL := '';
   OpenMasterdata_OAuthCustomernumberRequired := false;
   OpenMasterdata_OAuthUsernameRequired := false;
+  OpenMasterdata_OAuthClientSecretRequired := false;
   OpenMasterdata_bySupplierPIDURL := '';
   OpenMasterdata_byManufacturerDataURL := '';
   OpenMasterdata_byGTINURL := '';

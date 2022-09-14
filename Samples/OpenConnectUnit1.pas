@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ComCtrls, System.IniFiles,Winapi.ShellAPI,
-  Vcl.ExtCtrls, System.UITypes,
+  Vcl.ExtCtrls, System.UITypes, Vcl.Clipbrd,
   intf.OpenConnect;
 
 type
@@ -44,6 +44,7 @@ type
     Label17: TLabel;
     Edit9: TEdit;
     Label18: TLabel;
+    Button4: TButton;
     procedure FormCreate(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -53,10 +54,12 @@ type
     procedure Label10Click(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Button3Click(Sender: TObject);
+    procedure Button4Click(Sender: TObject);
   public
     Suppliers: TOpenConnectBusinessList;
     Configuration : TMemIniFile;
     Editable : Boolean;
+    OpenMasterdataConfigurationAsText : String;
   end;
 
 var
@@ -235,8 +238,6 @@ begin
     ListView1.Items[i].SubItems[ListView1.Selected.SubItems.Count-1] := 'vorhanden'
   else
     ListView1.Items[i].SubItems[ListView1.Selected.SubItems.Count-1] := '';
-
-
 end;
 
 procedure TMainForm.ListView1SelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
@@ -274,6 +275,7 @@ begin
   Edit7.Text := '';
   Edit8.Text := '';
   Edit9.Text := '';
+  OpenMasterdataConfigurationAsText := '';
 
   if ListView1.Selected = nil then
     exit;
@@ -312,19 +314,39 @@ begin
     end else
       Edit2.Text := connectivity.IDSConnectURL;
 
+    var section : String := ListView1.Selected.SubItems[1]+'-'+ListView1.Selected.SubItems[0]+'-'+ListView1.Selected.SubItems[3];
+    Configuration.WriteString(section,'idsconnectprocesses',Edit1.Text);
+    Configuration.WriteString(section,'idsconnecturl',Edit2.Text);
+
     if connectivity.OpenMasterdataAvailable then
     begin
       Label14.Caption := 'verfuegbar';
       if connectivity.OpenMasterdata_OAuthCustomernumberRequired then
-        Label14.Caption := Label14.Caption +' +CNr';
+        Label14.Caption := Label14.Caption +' +CN';
       if connectivity.OpenMasterdata_OAuthUsernameRequired then
         Label14.Caption := Label14.Caption +' +UN';
+      if connectivity.OpenMasterdata_OAuthClientSecretRequired then
+        Label14.Caption := Label14.Caption +' +CS';
+
+      Edit6.Text := connectivity.OpenMasterdata_OAuthURL;
+      Edit7.Text := connectivity.OpenMasterdata_bySupplierPIDURL;
+      Edit8.Text := connectivity.OpenMasterdata_byManufacturerDataURL;
+      Edit9.Text := connectivity.OpenMasterdata_byGTINURL;
+
+      OpenMasterdataConfigurationAsText := '['+ListView1.Selected.SubItems[2]+']'+#13#10+
+               'Username='+Edit4.Text+#13#10+
+               'Password='+Edit5.Text+#13#10+
+               'Customernumber='+Edit3.Text+#13#10+
+               'UsernameRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthUsernameRequired,true)+#13#10+
+               'CustomernumberRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthCustomernumberRequired,true)+#13#10+
+               'ClientSecretRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthClientSecretRequired,true)+#13#10+
+               'OAuthURL='+connectivity.OpenMasterdata_OAuthURL+#13#10+
+               'BySupplierPIDURL='+connectivity.OpenMasterdata_bySupplierPIDURL+#13#10+
+               'ByManufacturerDataURL='+connectivity.OpenMasterdata_byManufacturerDataURL+#13#10+
+               'ByGTINURL='+connectivity.OpenMasterdata_byGTINURL+#13#10+
+               'ArtNoAsCommatext=';
     end else
       Label14.Caption := 'nicht verfuegbar';
-    Edit6.Text := connectivity.OpenMasterdata_OAuthURL;
-    Edit7.Text := connectivity.OpenMasterdata_bySupplierPIDURL;
-    Edit8.Text := connectivity.OpenMasterdata_byManufacturerDataURL;
-    Edit9.Text := connectivity.OpenMasterdata_byGTINURL;
 
   finally
     Screen.Cursor := crDefault;
@@ -334,6 +356,12 @@ end;
 procedure TMainForm.Button3Click(Sender: TObject);
 begin
   Close;
+end;
+
+procedure TMainForm.Button4Click(Sender: TObject);
+begin
+  Clipboard.AsText := OpenMasterdataConfigurationAsText;
+  ShowMessage(OpenMasterdataConfigurationAsText);
 end;
 
 procedure TMainForm.Label10Click(Sender: TObject);
