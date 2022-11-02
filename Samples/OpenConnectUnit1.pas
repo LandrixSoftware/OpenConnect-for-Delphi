@@ -337,6 +337,9 @@ begin
                'Username='+Edit4.Text+#13#10+
                'Password='+Edit5.Text+#13#10+
                'Customernumber='+Edit3.Text+#13#10+
+               'ClientID='+
+               'ClientSecret='+
+               'ClientScope='+
                'UsernameRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthUsernameRequired,true)+#13#10+
                'CustomernumberRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthCustomernumberRequired,true)+#13#10+
                'ClientSecretRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthClientSecretRequired,true)+#13#10+
