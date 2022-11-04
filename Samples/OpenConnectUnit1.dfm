@@ -2,7 +2,7 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'OpenConnect for Delphi'
-  ClientHeight = 682
+  ClientHeight = 715
   ClientWidth = 1286
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -19,7 +19,7 @@ object MainForm: TMainForm
     Left = 0
     Top = 0
     Width = 1024
-    Height = 641
+    Height = 674
     Align = alClient
     Columns = <>
     GridLines = True
@@ -33,7 +33,7 @@ object MainForm: TMainForm
     Left = 1024
     Top = 0
     Width = 262
-    Height = 641
+    Height = 674
     Align = alRight
     BevelOuter = bvNone
     TabOrder = 1
@@ -95,14 +95,14 @@ object MainForm: TMainForm
     end
     object Label9: TLabel
       Left = 17
-      Top = 336
+      Top = 320
       Width = 149
       Height = 13
       Caption = 'Naeheres zu IDSConnect unter'
     end
     object Label10: TLabel
       Left = 17
-      Top = 352
+      Top = 336
       Width = 230
       Height = 33
       Cursor = crHandPoint
@@ -172,6 +172,30 @@ object MainForm: TMainForm
       Width = 58
       Height = 13
       Caption = 'byGTIN URL'
+    end
+    object Label19: TLabel
+      Left = 17
+      Top = 600
+      Width = 176
+      Height = 13
+      Caption = 'Naeheres zu Open Masterdata unter'
+    end
+    object Label20: TLabel
+      Left = 17
+      Top = 616
+      Width = 230
+      Height = 33
+      Cursor = crHandPoint
+      AutoSize = False
+      Caption = 'https://github.com/LandrixSoftware/ OpenMasterdata-for-Delphi'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clBlue
+      Font.Height = -11
+      Font.Name = 'Tahoma'
+      Font.Style = [fsBold]
+      ParentFont = False
+      WordWrap = True
+      OnClick = Label20Click
     end
     object Button2: TButton
       Left = 128
@@ -256,17 +280,26 @@ object MainForm: TMainForm
     end
     object Button4: TButton
       Left = 16
-      Top = 603
+      Top = 649
       Width = 235
       Height = 25
-      Caption = 'Kopiere Konfiguration in die Zwischenablage'
+      Caption = 'Kopiere OMD-Konfiguration in Zwischenablage'
       TabOrder = 10
       OnClick = Button4Click
+    end
+    object Button5: TButton
+      Left = 16
+      Top = 363
+      Width = 235
+      Height = 25
+      Caption = 'Kopiere IDS-Konfiguration in Zwischenablage'
+      TabOrder = 11
+      OnClick = Button5Click
     end
   end
   object Panel2: TPanel
     Left = 0
-    Top = 641
+    Top = 674
     Width = 1286
     Height = 41
     Align = alBottom

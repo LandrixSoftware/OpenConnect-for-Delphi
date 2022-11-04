@@ -45,6 +45,9 @@ type
     Edit9: TEdit;
     Label18: TLabel;
     Button4: TButton;
+    Button5: TButton;
+    Label19: TLabel;
+    Label20: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -55,11 +58,14 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Button3Click(Sender: TObject);
     procedure Button4Click(Sender: TObject);
+    procedure Label20Click(Sender: TObject);
+    procedure Button5Click(Sender: TObject);
   public
     Suppliers: TOpenConnectBusinessList;
     Configuration : TMemIniFile;
     Editable : Boolean;
     OpenMasterdataConfigurationAsText : String;
+    IDSConnectConfigurationAsText : String;
   end;
 
 var
@@ -276,6 +282,7 @@ begin
   Edit8.Text := '';
   Edit9.Text := '';
   OpenMasterdataConfigurationAsText := '';
+  IDSConnectConfigurationAsText := '';
 
   if ListView1.Selected = nil then
     exit;
@@ -317,6 +324,12 @@ begin
     var section : String := ListView1.Selected.SubItems[1]+'-'+ListView1.Selected.SubItems[0]+'-'+ListView1.Selected.SubItems[3];
     Configuration.WriteString(section,'idsconnectprocesses',Edit1.Text);
     Configuration.WriteString(section,'idsconnecturl',Edit2.Text);
+
+    IDSConnectConfigurationAsText  := '['+ListView1.Selected.SubItems[2]+']'+#13#10+
+             'Username='+Edit4.Text+#13#10+
+             'Password='+Edit5.Text+#13#10+
+             'Customernumber='+Edit3.Text+#13#10+
+             'IDSConnectUrl='+Edit2.Text;
 
     if connectivity.OpenMasterdataAvailable then
     begin
@@ -367,9 +380,20 @@ begin
   ShowMessage(OpenMasterdataConfigurationAsText);
 end;
 
+procedure TMainForm.Button5Click(Sender: TObject);
+begin
+  Clipboard.AsText := IDSConnectConfigurationAsText;
+  ShowMessage(IDSConnectConfigurationAsText);
+end;
+
 procedure TMainForm.Label10Click(Sender: TObject);
 begin
   ShellExecute(0,'open',PChar('https://github.com/LandrixSoftware/IDSConnect-for-Delphi'),'','',SW_SHOWNORMAL);
+end;
+
+procedure TMainForm.Label20Click(Sender: TObject);
+begin
+  ShellExecute(0,'open',PChar('https://github.com/LandrixSoftware/OpenMasterdata-for-Delphi'),'','',SW_SHOWNORMAL);
 end;
 
 end.
