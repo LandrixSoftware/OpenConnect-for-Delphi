@@ -620,11 +620,11 @@ begin
         begin
           _Connectivity.OpenMasterdata_bySupplierPIDURL := aia_p.URL;
         end else
-        if SameText(aia_p.Prozesscode,'OMD-1-0-5-byManufacturerDataURL') then
+        if SameText(aia_p.Prozesscode,'OMD-1-0-5-byManufacturerData') then
         begin
           _Connectivity.OpenMasterdata_byManufacturerDataURL := aia_p.URL;
         end else
-        if SameText(aia_p.Prozesscode,'OMD-1-0-5-byGTINURL') then
+        if SameText(aia_p.Prozesscode,'OMD-1-0-5-byGtin') then
         begin
           _Connectivity.OpenMasterdata_byGTINURL := aia_p.URL;
         end;
