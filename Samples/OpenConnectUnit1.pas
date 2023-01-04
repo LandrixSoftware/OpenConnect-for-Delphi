@@ -48,6 +48,8 @@ type
     Button5: TButton;
     Label19: TLabel;
     Label20: TLabel;
+    Label21: TLabel;
+    edSearchSupplier: TEdit;
     procedure FormCreate(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -60,6 +62,10 @@ type
     procedure Button4Click(Sender: TObject);
     procedure Label20Click(Sender: TObject);
     procedure Button5Click(Sender: TObject);
+    procedure edSearchSupplierChange(Sender: TObject);
+    procedure ListView1CustomDrawSubItem(Sender: TCustomListView;
+      Item: TListItem; SubItem: Integer; State: TCustomDrawState;
+      var DefaultDraw: Boolean);
   public
     Suppliers: TOpenConnectBusinessList;
     Configuration : TMemIniFile;
@@ -100,71 +106,70 @@ begin
   begin
     Caption := 'Service-Name';
     Alignment := taLeftJustify;
-    Width := 80;
+    Width := MulDiv(80,Screen.PixelsPerInch,96);
   end;
   with ListView1.Columns.Add do
   begin
     Caption := 'Service-ID';
     Alignment := taLeftJustify;
-    Width := 50;
+    Width := MulDiv(71,Screen.PixelsPerInch,96);
   end;
   with ListView1.Columns.Add do
   begin
     Caption := 'ServiceURL';
     Alignment := taLeftJustify;
-    Width := 100;
+    Width := MulDiv(200,Screen.PixelsPerInch,96);
   end;
-
   with ListView1.Columns.Add do
   begin
     Caption := 'Supplier-Name';
     Alignment := taLeftJustify;
-    Width := 140;
+    Width := MulDiv(270,Screen.PixelsPerInch,96);
   end;
   with ListView1.Columns.Add do
   begin
     Caption := 'Supplier-ID';
     Alignment := taLeftJustify;
-    Width := 50;
+    Width := MulDiv(65,Screen.PixelsPerInch,96);
   end;
   with ListView1.Columns.Add do
   begin
     Caption := 'Street';
     Alignment := taLeftJustify;
-    Width := 100;
+    Width := MulDiv(125,Screen.PixelsPerInch,96);
   end;
   with ListView1.Columns.Add do
   begin
     Caption := 'Zip';
     Alignment := taLeftJustify;
-    Width := 50;
+    Width := MulDiv(60,Screen.PixelsPerInch,96);
   end;
   with ListView1.Columns.Add do
   begin
     Caption := 'City';
     Alignment := taLeftJustify;
-    Width := 100;
+    Width := MulDiv(133,Screen.PixelsPerInch,96);
   end;
   with ListView1.Columns.Add do
   begin
     Caption := 'Country';
     Alignment := taLeftJustify;
-    Width := 100;
+    Width := MulDiv(100,Screen.PixelsPerInch,96);
   end;
   with ListView1.Columns.Add do
   begin
     Caption := 'Configuration';
     Alignment := taLeftJustify;
-    Width := 50;
+    Width := MulDiv(78,Screen.PixelsPerInch,96);
   end;
-  for var i : Integer := 0 to ListView1.Columns.Count-1 do
-    ListView1.Columns[i].Width := Configuration.ReadInteger(ListView1.Name,i.ToString,ListView1.Columns[i].Width);
+  //for var i : Integer := 0 to ListView1.Columns.Count-1 do
+  //  ListView1.Columns[i].Width := Configuration.ReadInteger(ListView1.Name,i.ToString,ListView1.Columns[i].Width);
 end;
 
 procedure TMainForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  for var i : Integer := 0 to ListView1.Columns.Count-1 do
-    Configuration.WriteInteger(ListView1.Name,i.ToString,ListView1.Columns[i].Width);
+  //for var i : Integer := 0 to ListView1.Columns.Count-1 do
+  //  Configuration.WriteInteger(ListView1.Name,i.ToString,ListView1.Columns[i].Width);
 end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
@@ -244,6 +249,27 @@ begin
     ListView1.Items[i].SubItems[ListView1.Selected.SubItems.Count-1] := 'vorhanden'
   else
     ListView1.Items[i].SubItems[ListView1.Selected.SubItems.Count-1] := '';
+end;
+
+procedure TMainForm.edSearchSupplierChange(Sender: TObject);
+begin
+  ListView1.Repaint;
+end;
+
+procedure TMainForm.ListView1CustomDrawSubItem(Sender: TCustomListView;
+  Item: TListItem; SubItem: Integer; State: TCustomDrawState;
+  var DefaultDraw: Boolean);
+begin
+  DefaultDraw := true;
+
+  if edSearchSupplier.Text = '' then
+    exit;
+
+  if ((SubItem = 3) and (Item.SubItems.Count > 1)) then
+  begin
+    if Pos(LowerCase(edSearchSupplier.Text),LowerCase(Item.SubItems.Strings[2])) > 0 then
+      Sender.Canvas.Font.Style := [fsBold];
+  end;
 end;
 
 procedure TMainForm.ListView1SelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
@@ -350,9 +376,10 @@ begin
                'Username='+Edit4.Text+#13#10+
                'Password='+Edit5.Text+#13#10+
                'Customernumber='+Edit3.Text+#13#10+
-               'ClientID='+
-               'ClientSecret='+
-               'ClientScope='+
+               'ClientID='+#13#10+
+               'ClientSecret='+#13#10+
+               'ClientScope='+#13#10+
+               'GrantType='+#13#10+
                'UsernameRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthUsernameRequired,true)+#13#10+
                'CustomernumberRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthCustomernumberRequired,true)+#13#10+
                'ClientSecretRequired='+BoolToStr(connectivity.OpenMasterdata_OAuthClientSecretRequired,true)+#13#10+

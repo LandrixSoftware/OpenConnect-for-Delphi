@@ -27,6 +27,7 @@ object MainForm: TMainForm
     RowSelect = True
     TabOrder = 0
     ViewStyle = vsReport
+    OnCustomDrawSubItem = ListView1CustomDrawSubItem
     OnSelectItem = ListView1SelectItem
   end
   object Panel1: TPanel
@@ -308,6 +309,13 @@ object MainForm: TMainForm
     DesignSize = (
       1286
       41)
+    object Label21: TLabel
+      Left = 128
+      Top = 12
+      Width = 78
+      Height = 13
+      Caption = 'Anbieter suchen'
+    end
     object Button1: TButton
       Left = 8
       Top = 6
@@ -335,6 +343,14 @@ object MainForm: TMainForm
       Anchors = [akTop, akRight]
       Caption = 'Aenderungen nicht speichern'
       TabOrder = 2
+    end
+    object edSearchSupplier: TEdit
+      Left = 212
+      Top = 8
+      Width = 157
+      Height = 21
+      TabOrder = 3
+      OnChange = edSearchSupplierChange
     end
   end
 end
