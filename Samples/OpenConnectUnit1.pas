@@ -50,6 +50,7 @@ type
     Label20: TLabel;
     Label21: TLabel;
     edSearchSupplier: TEdit;
+    CheckBox2: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -66,6 +67,9 @@ type
     procedure ListView1CustomDrawSubItem(Sender: TCustomListView;
       Item: TListItem; SubItem: Integer; State: TCustomDrawState;
       var DefaultDraw: Boolean);
+  private
+    procedure PopulateSuppliers;
+    function SupplierMatchesFilter(const SupplierName: String): Boolean;
   public
     Suppliers: TOpenConnectBusinessList;
     Configuration : TMemIniFile;
@@ -185,8 +189,6 @@ begin
 end;
 
 procedure TMainForm.Button1Click(Sender: TObject);
-var
-  i,j : Integer;
 begin
   ListView1.Clear;
   Suppliers.Clear;
@@ -198,25 +200,8 @@ begin
   finally
     Screen.Cursor := crDefault;
   end;
-  
-  for i := 0 to Suppliers.Count-1 do
-  for j := 0 to Suppliers[i].Supplier.Count-1 do
-  with ListView1.Items.Add do
-  begin
-    Caption := Suppliers[i].Description;
-    SubItems.Add(IntToStr(Suppliers[i].ID));
-    SubItems.Add(Suppliers[i].ServiceURL);
-    SubItems.Add(Suppliers[i].Supplier[j].Name);
-    SubItems.Add(IntToStr(Suppliers[i].Supplier[j].ID));
-    SubItems.Add(Suppliers[i].Supplier[j].Street);
-    SubItems.Add(Suppliers[i].Supplier[j].Zip);
-    SubItems.Add(Suppliers[i].Supplier[j].City);
-    SubItems.Add(Suppliers[i].Supplier[j].Country);
-    if Configuration.SectionExists(Suppliers[i].ServiceURL+'-'+IntToStr(Suppliers[i].ID)+'-'+IntToStr(Suppliers[i].Supplier[j].ID)) then
-      SubItems.Add('vorhanden')
-    else
-      SubItems.Add('');
-  end;
+
+  PopulateSuppliers;
 end;
 
 procedure TMainForm.Edit3Change(Sender: TObject);
@@ -253,7 +238,7 @@ end;
 
 procedure TMainForm.edSearchSupplierChange(Sender: TObject);
 begin
-  ListView1.Repaint;
+  PopulateSuppliers;
 end;
 
 procedure TMainForm.ListView1CustomDrawSubItem(Sender: TCustomListView;
@@ -261,15 +246,6 @@ procedure TMainForm.ListView1CustomDrawSubItem(Sender: TCustomListView;
   var DefaultDraw: Boolean);
 begin
   DefaultDraw := true;
-
-  if edSearchSupplier.Text = '' then
-    exit;
-
-  if ((SubItem = 3) and (Item.SubItems.Count > 1)) then
-  begin
-    if Pos(LowerCase(edSearchSupplier.Text),LowerCase(Item.SubItems.Strings[2])) > 0 then
-      Sender.Canvas.Font.Style := [fsBold];
-  end;
 end;
 
 procedure TMainForm.ListView1SelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
@@ -291,6 +267,56 @@ begin
   finally
     Editable := true;
   end;
+end;
+
+procedure TMainForm.PopulateSuppliers;
+var
+  i, j : Integer;
+  section : String;
+begin
+  ListView1.Items.BeginUpdate;
+  try
+    ListView1.Clear;
+
+    for i := 0 to Suppliers.Count-1 do
+    for j := 0 to Suppliers[i].Supplier.Count-1 do
+    begin
+      section := Suppliers[i].ServiceURL+'-'+IntToStr(Suppliers[i].ID)+'-'+IntToStr(Suppliers[i].Supplier[j].ID);
+
+      if CheckBox2.Checked and not Configuration.SectionExists(section) then
+        continue;
+
+      if not SupplierMatchesFilter(Suppliers[i].Supplier[j].Name) then
+        continue;
+
+      with ListView1.Items.Add do
+      begin
+        Caption := Suppliers[i].Description;
+        SubItems.Add(IntToStr(Suppliers[i].ID));
+        SubItems.Add(Suppliers[i].ServiceURL);
+        SubItems.Add(Suppliers[i].Supplier[j].Name);
+        SubItems.Add(IntToStr(Suppliers[i].Supplier[j].ID));
+        SubItems.Add(Suppliers[i].Supplier[j].Street);
+        SubItems.Add(Suppliers[i].Supplier[j].Zip);
+        SubItems.Add(Suppliers[i].Supplier[j].City);
+        SubItems.Add(Suppliers[i].Supplier[j].Country);
+        if Configuration.SectionExists(section) then
+          SubItems.Add('vorhanden')
+        else
+          SubItems.Add('');
+      end;
+    end;
+  finally
+    ListView1.Items.EndUpdate;
+  end;
+end;
+
+function TMainForm.SupplierMatchesFilter(const SupplierName: String): Boolean;
+var
+  filterText : String;
+begin
+  filterText := Trim(edSearchSupplier.Text);
+  Result := filterText.IsEmpty or (Pos(LowerCase(filterText), LowerCase(SupplierName)) > 0);
 end;
 
 procedure TMainForm.Button2Click(Sender: TObject);

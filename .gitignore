@@ -31,6 +31,10 @@ Samples/Win32
 Samples/Win64
 Samples/configuration.ini
 
+GPATH
+GRTAGS
+GTAGS
+
 # Delphi compiler-generated binaries (safe to delete)
 *.exe
 *.dll

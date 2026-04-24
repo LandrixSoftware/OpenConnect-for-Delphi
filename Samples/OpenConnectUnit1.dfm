@@ -14,7 +14,6 @@ object MainForm: TMainForm
   OnClose = FormClose
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  TextHeight = 13
   object ListView1: TListView
     Left = 0
     Top = 0
@@ -351,6 +350,15 @@ object MainForm: TMainForm
       Height = 21
       TabOrder = 3
       OnChange = edSearchSupplierChange
+    end
+    object CheckBox2: TCheckBox
+      Left = 375
+      Top = 10
+      Width = 242
+      Height = 17
+      Caption = 'Nur Eintr'#228'ge mit Konfiguration anzeigen'
+      OnClick = edSearchSupplierChange
+      TabOrder = 4
     end
   end
 end
