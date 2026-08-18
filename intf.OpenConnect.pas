@@ -103,7 +103,7 @@ type
     Text : String;
     FileID : Cardinal;
     FileURL : String;
-    FileSize : Cardinal;
+    FileSize : Int64;
     FileName : String;
     FileDate : TDateTime;
     HttpAuthActiv    : Boolean;
@@ -137,10 +137,17 @@ type
     SHKCONNECT_SERVICE_PROC_BL  = '/services/Branchenliste';
     SHKCONNECT_SERVICE_PROC_AA  = '/services/AllgemeineAuskuenfte';
     SHKCONNECT_SERVICE_PROC_AIA = '/services/AnwenderIndividuelleAuskuenfte';
+  strict private
+    class var FLastSOAPRequest : String;
+    class var FLastSOAPRequestLock : TObject;
+    class function GetLastSOAPRequest : String; static;
+    class procedure SetLastSOAPRequest(const _Value : String); static;
   public
+    class constructor Create;
+    class destructor Destroy;
     //Request-Body des letzten AnwenderIndividuelleAuskuenfte-Aufrufs,
     //Passwoerter maskiert - zur Fehlersuche bei Authentifizierungsproblemen
-    class var LastSOAPRequest : String;
+    class property LastSOAPRequest : String read GetLastSOAPRequest write SetLastSOAPRequest;
     class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
     class function GetDatanormFileList(_LoginOptions : TOpenConnectLoginOptions; _ResultList : TOpenConnectDatanormFileList) : Boolean;
     class function CheckConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _Connectivity : TOpenConnectConnectivityOptions) : Boolean;
@@ -151,12 +158,70 @@ type
 implementation
 
 uses
-  Soap.SOAPHTTPClient
+  Soap.SOAPHTTPClient, System.RegularExpressions
   ,intf.OpenConnectAllgemeineAuskuenfte
   ,intf.OpenConnectAnwenderIndividuelleAuskuenfte
   ,intf.OpenConnectBranchenliste;
 
 {$I intf.OpenConnect.inc}
+
+//Prozesscodes werden durch Leerzeichen getrennt gespeichert - tokenweiser
+//Vergleich statt Substring-Suche, damit z.B. 'WK' nicht in 'WKE' matcht
+function ContainsProcessToken(const _List, _Token : String) : Boolean;
+var
+  part : String;
+begin
+  Result := false;
+  for part in _List.Split([' ']) do
+  if SameText(part,_Token) then
+    exit(true);
+end;
+
+//Serverdatum unabhaengig von den Systemeinstellungen parsen
+//(ISO 8601 und deutsches Format, danach Fallback auf Systemeinstellungen)
+function ParseServerDate(const _Value : String) : TDateTime;
+var
+  fs : TFormatSettings;
+begin
+  Result := 0;
+  if _Value.Trim.IsEmpty then
+    exit;
+  fs := TFormatSettings.Create;
+  fs.DateSeparator := '-';
+  fs.ShortDateFormat := 'yyyy-mm-dd';
+  if TryStrToDate(_Value,Result,fs) then
+    exit;
+  fs.DateSeparator := '.';
+  fs.ShortDateFormat := 'dd.mm.yyyy';
+  if TryStrToDate(_Value,Result,fs) then
+    exit;
+  Result := StrToDateDef(_Value,0);
+end;
+
+//Status ist laut Schema optional und kann nil sein
+function StatusText(_Status : intf.OpenConnectAnwenderIndividuelleAuskuenfte.Status) : String; overload;
+begin
+  if _Status <> nil then
+    Result := _Status.Meldung
+  else
+    Result := 'Antwort ohne Statusinformation';
+end;
+
+function StatusText(_Status : intf.OpenConnectBranchenliste.Status) : String; overload;
+begin
+  if _Status <> nil then
+    Result := _Status.Meldung
+  else
+    Result := 'Antwort ohne Statusinformation';
+end;
+
+function StatusText(_Status : intf.OpenConnectAllgemeineAuskuenfte.Status) : String; overload;
+begin
+  if _Status <> nil then
+    Result := _Status.Meldung
+  else
+    Result := 'Antwort ohne Statusinformation';
+end;
 
 { TOpenConnectSupplier }
 
@@ -208,7 +273,12 @@ end;
 
 function TOpenConnectSupplierList.GetItemBySupplierID(
   const _ID: Integer): TOpenConnectSupplier;
+var
+  i : Integer;
 begin
+  for i := 0 to Count-1 do
+  if Items[i].ID = _ID then
+    exit(Items[i]);
   Result := TOpenConnectSupplier.Create;
   Result.ID := _ID;
   Add(Result);
@@ -322,20 +392,46 @@ end;
 
 { TOpenConnectHelper }
 
+class constructor TOpenConnectHelper.Create;
+begin
+  FLastSOAPRequestLock := TObject.Create;
+end;
+
+class destructor TOpenConnectHelper.Destroy;
+begin
+  FreeAndNil(FLastSOAPRequestLock);
+end;
+
+class function TOpenConnectHelper.GetLastSOAPRequest: String;
+begin
+  System.TMonitor.Enter(FLastSOAPRequestLock);
+  try
+    Result := FLastSOAPRequest;
+    UniqueString(Result);
+  finally
+    System.TMonitor.Exit(FLastSOAPRequestLock);
+  end;
+end;
+
+class procedure TOpenConnectHelper.SetLastSOAPRequest(const _Value: String);
+begin
+  System.TMonitor.Enter(FLastSOAPRequestLock);
+  try
+    FLastSOAPRequest := _Value;
+    UniqueString(FLastSOAPRequest);
+  finally
+    System.TMonitor.Exit(FLastSOAPRequestLock);
+  end;
+end;
+
 class function TOpenConnectHelper.MaskPasswords(const _SOAPBody: String): String;
 
+  //maskiert alle Vorkommen, auch mit Namespace-Praefix oder Attributen
   function MaskTag(const _Body, _TagName : String) : String;
-  var
-    openTag,closeTag : String;
-    startPos,endPos : Integer;
   begin
-    Result := _Body;
-    openTag := '<'+_TagName+'>';
-    closeTag := '</'+_TagName+'>';
-    startPos := Pos(openTag,Result);
-    endPos := Pos(closeTag,Result);
-    if (startPos > 0) and (endPos > startPos) then
-      Result := Copy(Result,1,startPos+Length(openTag)-1)+'***'+Copy(Result,endPos,MaxInt);
+    Result := TRegEx.Replace(_Body,
+      '(<(?:[A-Za-z0-9_.-]+:)?'+_TagName+'(?:\s[^>]*)?>).*?(</(?:[A-Za-z0-9_.-]+:)?'+_TagName+'>)',
+      '$1***$2',[roSingleLine]);
   end;
 
 begin
@@ -369,78 +465,80 @@ begin
       serviceURL := serviceURL.Insert(4,'s');
 
     aia_gb := GetIndividuelleAuskunft.Create;
-    aia_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
-    aia_gb.Softwarename := OPENCONNECT_LOGIN;
-    aia_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
-    aia_gb.UnternehmensID := _LoginOptions.SupplierID;
-    //Leere Felder nicht als leere XML-Elemente uebertragen, da einige
-    //Unternehmen vorhandene, aber leere Zugangsdaten-Elemente ablehnen
-    if not _LoginOptions.CustomerNo.Trim.IsEmpty then
-      aia_gb.Kundennummer := _LoginOptions.CustomerNo.Trim;
-    if not _LoginOptions.Username.Trim.IsEmpty then
-      aia_gb.Benutzername := _LoginOptions.Username.Trim;
-    if not _LoginOptions.Password.Trim.IsEmpty then
-      aia_gb.Passwort := _LoginOptions.Password.Trim;
-
     soapCapture := TOpenConnectSOAPRequestCapture.Create;
+    aia_b := nil;
+    aia_resp := nil;
     try
+      aia_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
+      aia_gb.Softwarename := OPENCONNECT_LOGIN;
+      aia_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
+      aia_gb.UnternehmensID := _LoginOptions.SupplierID;
+      //Leere Felder nicht als leere XML-Elemente uebertragen, da einige
+      //Unternehmen vorhandene, aber leere Zugangsdaten-Elemente ablehnen
+      if not _LoginOptions.CustomerNo.Trim.IsEmpty then
+        aia_gb.Kundennummer := _LoginOptions.CustomerNo.Trim;
+      if not _LoginOptions.Username.Trim.IsEmpty then
+        aia_gb.Benutzername := _LoginOptions.Username.Trim;
+      if not _LoginOptions.Password.Trim.IsEmpty then
+        aia_gb.Passwort := _LoginOptions.Password.Trim;
+
       rio := THTTPRIO.Create(nil);
       rio.OnBeforeExecute := soapCapture.BeforeExecute;
       aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,serviceURL+SHKCONNECT_SERVICE_PROC_AIA,rio);
       aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
       LastSOAPRequest := MaskPasswords(soapCapture.RequestBody);
-    finally
-      soapCapture.Free;
-    end;
 
-    if aia_resp.Status.Code = '0' then
-    begin
-      for aia_p in aia_resp.Prozessliste do
-      if (aia_p.Prozesscode = 'STD') then
+      if (aia_resp.Status <> nil) and (aia_resp.Status.Code = '0') then
       begin
-        for aia_l in aia_p.Link do
+        for aia_p in aia_resp.Prozessliste do
+        if SameText(aia_p.Prozesscode,'STD') then
         begin
-          dof := TOpenConnectDatanormFile.Create;
-          _ResultList.Add(dof);
-          dof.Text := aia_l.Beschreibung + ' '+aia_l.AenderungsInfo;
-          //dof.FileID := aia_l.Beschreibung;
-          dof.FileURL := aia_l.URL;
-          dof.FileDate := StrToDateDef(aia_l.DatenDatum,0);//aia_l.Datum,0);
-          dof.FileSize := aia_l.Groesse;
-          if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.HTTPAUTH then
+          for aia_l in aia_p.Link do
           begin
-            dof.HttpAuthActiv := true;
-            dof.HttpAuthUsername := _LoginOptions.Username;
-            dof.HttpAuthPassword := _LoginOptions.Password;
-          end
-          else
-          if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.URL then
-          begin
-            dof.HttpAuthActiv := false;
-          end
-          else
-          if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.COOKIE then
-          begin
-            for aia_c in aia_l.CookieList do
+            dof := TOpenConnectDatanormFile.Create;
+            _ResultList.Add(dof);
+            dof.Text := aia_l.Beschreibung + ' '+aia_l.AenderungsInfo;
+            //dof.FileID := aia_l.Beschreibung;
+            dof.FileURL := aia_l.URL;
+            dof.FileName := aia_l.Dateiname_org;
+            dof.FileDate := ParseServerDate(aia_l.DatenDatum);
+            dof.FileSize := aia_l.Groesse;
+            if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.HTTPAUTH then
             begin
-              dof.Cookie.Add(aia_c);
+              dof.HttpAuthActiv := true;
+              dof.HttpAuthUsername := _LoginOptions.Username.Trim;
+              dof.HttpAuthPassword := _LoginOptions.Password.Trim;
+            end
+            else
+            if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.URL then
+            begin
+              dof.HttpAuthActiv := false;
+            end
+            else
+            if aia_l.Authentifizierungsmethode = Authentifizierungsmethode.COOKIE then
+            begin
+              dof.CookieActiv := true;
+              for aia_c in aia_l.CookieList do
+              begin
+                dof.Cookie.Add(aia_c);
+              end;
+              //URL, , KEINE,
             end;
-            //URL, , KEINE,
           end;
         end;
-      end;
-      //_ResultList.SortByDate;
-      Result := true;
-    end else
-      MessageDlg(serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung+#10#10+
-        'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest, mtError, [mbOK], 0);
-
-    aia_resp.Free;
-    aia_b := nil;
-
-    aia_gb.Free;
+        //_ResultList.SortByDate;
+        Result := true;
+      end else
+        MessageDlg(serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+StatusText(aia_resp.Status)+#10#10+
+          'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest, mtError, [mbOK], 0);
+    finally
+      aia_resp.Free;
+      aia_b := nil; //gibt das RIO frei, danach darf erst soapCapture freigegeben werden
+      soapCapture.Free;
+      aia_gb.Free;
+    end;
   except
-    on E:Exception do begin MessageDlg('GetAnwenderIndividuelleAuskuenfteBean'+#10+e.Message+' '+e.ClassName, mtError, [mbOK], 0);; exit; end;
+    on E:Exception do begin MessageDlg('GetAnwenderIndividuelleAuskuenfteBean'+#10+e.Message+' '+e.ClassName, mtError, [mbOK], 0); exit; end;
   end;
 end;
 
@@ -448,6 +546,7 @@ class function TOpenConnectHelper.GetErrorCodeAsString(
   _ErrorNumber: Integer): String;
 begin
   case _ErrorNumber of
+    0 : Result := 'Es ist kein Fehler aufgetreten.';
     1 : Result := 'Fehler bei der Authentifizierung der anfragenden Software.';
     2 : Result := 'Der angefragte Prozess existiert nicht im SHK Connect Server.';
     3 : Result := 'Das angefragte Unternehmen existiert nicht im SHK Connect Server.';
@@ -457,17 +556,12 @@ begin
     7 : Result := 'Fehler bei der Kommunikation mit dem angefragten Unternehmen.';
     9 : Result := 'Fehlerhafte Anfrage (z.B. Pflichtfelder in der Anfrage fehlen)';
     10 : Result := 'Testantwort';
-    else Result := 'Es ist kein Fehler aufgetreten.';
+    else Result := 'Unbekannter Fehler (Code '+IntToStr(_ErrorNumber)+').';
   end;
 end;
 
 class function TOpenConnectHelper.GetSupplierList(_ResultList: TOpenConnectBusinessList): Boolean;
 var
-  bl_gb : GetBranchenListe;
-  bl_b : BranchenlisteBean;
-  bl_resp : GetBranchenListeAntwort;
-  bl_br : Branche;
-
   aa_gb : GetAllgemeineAuskunft;
   aa_b : AllgemeineAuskuenfteBean;
   aa_resp : GetAllgemeineAuskunftAntwort;
@@ -475,141 +569,114 @@ var
 
   i : Integer;
 
-  businessItm : TOpenConnectBusiness;
   supplierItm : TOpenConnectSupplier;
+  anySuccess : Boolean;
+
+  procedure LoadBranchenliste(const _ServiceURL : String);
+  var
+    bl_gb : GetBranchenListe;
+    bl_b : BranchenlisteBean;
+    bl_resp : GetBranchenListeAntwort;
+    bl_br : Branche;
+    businessItm : TOpenConnectBusiness;
+  begin
+    try
+      bl_gb := GetBranchenListe.Create;
+      bl_b := nil;
+      bl_resp := nil;
+      try
+        bl_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
+        bl_gb.Softwarename := OPENCONNECT_LOGIN;
+        bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
+
+        bl_b := GetBranchenlisteBean(false,_ServiceURL+SHKCONNECT_SERVICE_PROC_BL);
+        bl_resp := bl_b.GetBranchenListe(bl_gb);
+
+        if (bl_resp.Status <> nil) and (bl_resp.Status.Code = '0') then
+        begin
+          for bl_br in bl_resp.Branche do
+          begin
+            businessItm := _ResultList.GetItemByBusiness(bl_br.ID,_ServiceURL,true);
+            businessItm.Description := bl_br.Name_;
+          end;
+          anySuccess := true;
+        end else
+          MessageDlg(_ServiceURL+SHKCONNECT_SERVICE_PROC_BL+#10+StatusText(bl_resp.Status), mtError, [mbOK], 0);
+      finally
+        bl_resp.Free;
+        bl_b := nil;
+        bl_gb.Free;
+      end;
+    except
+      //Server nicht erreichbar - restliche Dienste trotzdem abfragen
+    end;
+  end;
+
 begin
   Result := false;
 
   if _ResultList = nil then
     exit;
 
-  try
-    bl_gb := GetBranchenListe.Create;
-    bl_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
-    bl_gb.Softwarename := OPENCONNECT_LOGIN;
-    bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
+  anySuccess := false;
 
-    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_PROC_BL);
-    bl_resp := bl_b.GetBranchenListe(bl_gb);
-
-    if bl_resp.Status.Code = '0' then
-    begin
-      for bl_br in bl_resp.Branche do
-      begin
-        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_ARGE,true);
-        businessItm.Description := bl_br.Name_;
-      end;
-    end else
-      MessageDlg(SHKCONNECT_SERVICE_ARGE+SHKCONNECT_SERVICE_PROC_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
-
-    bl_resp.Free;
-    bl_b := nil;
-
-    bl_gb.Free;
-  except
-//    On E:Exception do begin TLog.Log(true,P_ERROR,'GetBranchenlisteBean '+SHKCONNECT_SERVICE_ARGE,e);  end;
-  end;
-
-  try
-    bl_gb := GetBranchenListe.Create;
-    bl_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
-    bl_gb.Softwarename := OPENCONNECT_LOGIN;
-    bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
-
-    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_PROC_BL);
-    bl_resp := bl_b.GetBranchenListe(bl_gb);
-
-    if bl_resp.Status.Code = '0' then
-    begin
-      for bl_br in bl_resp.Branche do
-      begin
-        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_SHKGH,true);
-        businessItm.Description := bl_br.Name_;
-      end;
-    end else
-      MessageDlg(SHKCONNECT_SERVICE_SHKGH+SHKCONNECT_SERVICE_PROC_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
-
-    bl_resp.Free;
-    bl_b := nil;
-
-    bl_gb.Free;
-  except
-//    On E:Exception do begin TLog.Log(true,P_ERROR,'GetBranchenlisteBean '+SHKCONNECT_SERVICE_SHKGH,e);  end;
-  end;
-
-  try
-    bl_gb := GetBranchenListe.Create;
-    bl_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
-    bl_gb.Softwarename := OPENCONNECT_LOGIN;
-    bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
-
-    bl_b := GetBranchenlisteBean(false,SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_PROC_BL);
-    bl_resp := bl_b.GetBranchenListe(bl_gb);
-
-    if bl_resp.Status.Code = '0' then
-    begin
-      for bl_br in bl_resp.Branche do
-      begin
-        businessItm := _ResultList.GetItemByBusiness(bl_br.ID,SHKCONNECT_SERVICE_OC,true);
-        businessItm.Description := bl_br.Name_;
-      end;
-    end else
-      MessageDlg(SHKCONNECT_SERVICE_OC+SHKCONNECT_SERVICE_PROC_BL+#10+bl_resp.Status.Meldung, mtError, [mbOK], 0);
-
-    bl_resp.Free;
-    bl_b := nil;
-
-    bl_gb.Free;
-  except
-//    On E:Exception do begin TLog.Log(true,P_ERROR,'GetBranchenlisteBean '+SHKCONNECT_SERVICE_OC,e);  end;
-  end;
+  LoadBranchenliste(SHKCONNECT_SERVICE_ARGE);
+  LoadBranchenliste(SHKCONNECT_SERVICE_SHKGH);
+  LoadBranchenliste(SHKCONNECT_SERVICE_OC);
 
   try
     aa_gb := GetAllgemeineAuskunft.Create;
-    aa_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
+    try
+      aa_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
 
-    aa_gb.Softwarename := OPENCONNECT_LOGIN;
-    aa_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
+      aa_gb.Softwarename := OPENCONNECT_LOGIN;
+      aa_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
-    for i := 0 to _ResultList.Count - 1 do
-    begin
-      aa_gb.BrancheID := IntToStr(_ResultList[i].ID);
-
-      try
-      aa_b := GetAllgemeineAuskuenfteBean(false,_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA);
-      aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
-
-      if aa_resp.Status.Code = '0' then
+      for i := 0 to _ResultList.Count - 1 do
       begin
-        for aa_u in aa_resp.Unternehmen do
-        begin
-          supplierItm := _ResultList[i].Supplier.GetItemBySupplierID(aa_u.ID);
-          supplierItm.Name := aa_u.Name_;
-          supplierItm.Street := aa_u.Strasse;
-          supplierItm.Zip := aa_u.PLZ;
-          supplierItm.City := aa_u.Ort;
-          supplierItm.Country := aa_u.Land;
-          supplierItm.ServiceURL := _ResultList[i].ServiceURL;
-          supplierItm.CustomerNumberRequired := aa_u.Kundennummer_erforderlich;
-          supplierItm.UsernameRequired := aa_u.Benutzername_erforderlich;
-          supplierItm.PasswordRequired := aa_u.Passwort_erforderlich;
+        aa_gb.BrancheID := IntToStr(_ResultList[i].ID);
+
+        try
+          aa_b := nil;
+          aa_resp := nil;
+          try
+            aa_b := GetAllgemeineAuskuenfteBean(false,_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA);
+            aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
+
+            if (aa_resp.Status <> nil) and (aa_resp.Status.Code = '0') then
+            begin
+              for aa_u in aa_resp.Unternehmen do
+              begin
+                supplierItm := _ResultList[i].Supplier.GetItemBySupplierID(aa_u.ID);
+                supplierItm.Name := aa_u.Name_;
+                supplierItm.Street := aa_u.Strasse;
+                supplierItm.Zip := aa_u.PLZ;
+                supplierItm.City := aa_u.Ort;
+                supplierItm.Country := aa_u.Land;
+                supplierItm.ServiceURL := _ResultList[i].ServiceURL;
+                supplierItm.CustomerNumberRequired := aa_u.Kundennummer_erforderlich;
+                supplierItm.UsernameRequired := aa_u.Benutzername_erforderlich;
+                supplierItm.PasswordRequired := aa_u.Passwort_erforderlich;
+              end;
+            end else
+              MessageDlg(_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA+#10+StatusText(aa_resp.Status), mtError, [mbOK], 0);
+          finally
+            aa_resp.Free;
+            aa_b := nil;
+          end;
+        except
+          //einzelner Dienst nicht erreichbar - restliche trotzdem abfragen
         end;
-      end else
-        MessageDlg(_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA+#10+aa_resp.Status.Meldung, mtError, [mbOK], 0);
-
-      aa_resp.Free;
-      aa_b := nil;
-      except
-        //On E:Exception do begin TLog.Log(true,P_ERROR,'GetAllgemeineAuskuenfteBean '+SHKCONNECT_SERVICE_ARGE,e); exit; end;
       end;
+    finally
+      aa_gb.Free;
     end;
-
-    aa_gb.Free;
   except
 //    On E:Exception do begin TLog.Log(true,P_ERROR,'GetAllgemeineAuskuenfteBean',e); exit; end;
   end;
 
-  Result := true;
+  //true nur, wenn mindestens eine Branchenliste erfolgreich geladen wurde
+  Result := anySuccess;
 end;
 
 class function TOpenConnectHelper.CheckConnectivitiy(_LoginOptions: TOpenConnectLoginOptions;
@@ -622,19 +689,27 @@ var
   aia_tp : String;//Teilprozess
   rio : THTTPRIO;
   soapCapture : TOpenConnectSOAPRequestCapture;
+  serviceURL : String;
 begin
   Result := false;
 
   _Connectivity.Clear;
 
-  if _LoginOptions.CustomerNo.IsEmpty and _LoginOptions.Username.IsEmpty and _LoginOptions.Password.IsEmpty then
-    exit;
+  //Zugangsdaten duerfen komplett leer sein - es gibt Unternehmen, bei denen
+  //weder Kundennummer noch Benutzername noch Passwort erforderlich sind
   if _LoginOptions.ServiceURL.IsEmpty then
     exit;
   if _LoginOptions.SupplierID = 0 then
     exit;
 
+  serviceURL := _LoginOptions.ServiceURL;
+  if String.StartsText('http://',serviceURL) then
+    serviceURL := serviceURL.Insert(4,'s');
+
   aia_gb := GetIndividuelleAuskunft.Create;
+  soapCapture := TOpenConnectSOAPRequestCapture.Create;
+  aia_b := nil;
+  aia_resp := nil;
   try
   try
     aia_gb.Schnittstellenversion := TOpenConnectHelper.SHKCONNECT_VERSION;
@@ -650,18 +725,13 @@ begin
     if not _LoginOptions.Password.Trim.IsEmpty then
       aia_gb.Passwort := _LoginOptions.Password.Trim;
 
-    soapCapture := TOpenConnectSOAPRequestCapture.Create;
-    try
-      rio := THTTPRIO.Create(nil);
-      rio.OnBeforeExecute := soapCapture.BeforeExecute;
-      aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA,rio);
-      aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
-      LastSOAPRequest := MaskPasswords(soapCapture.RequestBody);
-    finally
-      soapCapture.Free;
-    end;
+    rio := THTTPRIO.Create(nil);
+    rio.OnBeforeExecute := soapCapture.BeforeExecute;
+    aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,serviceURL+SHKCONNECT_SERVICE_PROC_AIA,rio);
+    aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
+    LastSOAPRequest := MaskPasswords(soapCapture.RequestBody);
 
-    if aia_resp.Status.Code = '0' then
+    if (aia_resp.Status <> nil) and (aia_resp.Status.Code = '0') then
     begin
       for aia_p in aia_resp.Prozessliste do
         if SameText(aia_p.Prozesscode,'STD') then
@@ -676,7 +746,7 @@ begin
           _Connectivity.IDSConnectURL := aia_p.URL;
 
           for aia_tp in aia_p.Teilprozesse do
-          if Pos(aia_tp,_Connectivity.IDSConnectSupportedProcesses) = 0 then
+          if not ContainsProcessToken(_Connectivity.IDSConnectSupportedProcesses,aia_tp) then
             _Connectivity.IDSConnectSupportedProcesses := Trim(_Connectivity.IDSConnectSupportedProcesses+' '+aia_tp);
         end else
         if SameText(aia_p.Prozesscode,'OMD-oauth') then
@@ -707,13 +777,12 @@ begin
         end;
       Result := true;
     end else
-      MessageDlg(_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung+#10#10+
+      MessageDlg(serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+StatusText(aia_resp.Status)+#10#10+
         'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest, mtError, [mbOK], 0);
-
-    aia_resp.Free;
-    aia_b := nil;
-
   finally
+    aia_resp.Free;
+    aia_b := nil; //gibt das RIO frei, danach darf erst soapCapture freigegeben werden
+    soapCapture.Free;
     aia_gb.Free;
   end;
   except
@@ -741,26 +810,17 @@ end;
 
 function TOpenConnectConnectivityOptions.Support_IDSConnectADLProcess: Boolean;
 begin
-  Result := false;
-  if not IDSConnectAvailable then
-    exit;
-  Result := Pos('ADL',IDSConnectSupportedProcesses.ToUpper)>0;
+  Result := IDSConnectAvailable and ContainsProcessToken(IDSConnectSupportedProcesses,'ADL');
 end;
 
 function TOpenConnectConnectivityOptions.Support_IDSConnectWKEProcess: Boolean;
 begin
-  Result := false;
-  if not IDSConnectAvailable then
-    exit;
-  Result := Pos('WKE',IDSConnectSupportedProcesses.ToUpper)>0;
+  Result := IDSConnectAvailable and ContainsProcessToken(IDSConnectSupportedProcesses,'WKE');
 end;
 
 function TOpenConnectConnectivityOptions.Support_IDSConnectWKSProcess: Boolean;
 begin
-  Result := false;
-  if not IDSConnectAvailable then
-    exit;
-  Result := Pos('WKS',IDSConnectSupportedProcesses.ToUpper)>0;
+  Result := IDSConnectAvailable and ContainsProcessToken(IDSConnectSupportedProcesses,'WKS');
 end;
 
 { TOpenConnectDatanormFile }
