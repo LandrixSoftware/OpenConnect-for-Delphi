@@ -243,7 +243,6 @@ object MainForm: TMainForm
       Top = 91
       Width = 121
       Height = 21
-      PasswordChar = '*'
       TabOrder = 5
       OnChange = Edit3Change
     end
@@ -358,8 +357,8 @@ object MainForm: TMainForm
       Width = 242
       Height = 17
       Caption = 'Nur Eintr'#228'ge mit Konfiguration anzeigen'
-      OnClick = edSearchSupplierChange
       TabOrder = 4
+      OnClick = edSearchSupplierChange
     end
   end
 end
