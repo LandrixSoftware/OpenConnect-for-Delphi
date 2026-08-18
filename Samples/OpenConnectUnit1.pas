@@ -190,16 +190,28 @@ begin
 end;
 
 procedure TMainForm.Button1Click(Sender: TObject);
+var
+  errors : TStringList;
+  ok : Boolean;
 begin
   ListView1.Clear;
   Suppliers.Clear;
 
-  Screen.Cursor := crHourGlass;
+  errors := TStringList.Create;
   try
-    if not TOpenConnectHelper.GetSupplierList(Suppliers) then
+    Screen.Cursor := crHourGlass;
+    try
+      ok := TOpenConnectHelper.GetSupplierList(Suppliers,errors);
+    finally
+      Screen.Cursor := crDefault;
+    end;
+
+    if errors.Count > 0 then
+      MessageDlg(errors.Text, mtError, [mbOK], 0);
+    if not ok then
       exit;
   finally
-    Screen.Cursor := crDefault;
+    errors.Free;
   end;
 
   PopulateSuppliers;
@@ -328,6 +340,7 @@ procedure TMainForm.Button2Click(Sender: TObject);
 var
   loginOptions : TOpenConnectLoginOptions;
   connectivity: TOpenConnectConnectivityOptions;
+  errors : TStringList;
 begin
   //Waehrend die Felder programmgesteuert geaendert werden, darf Edit3Change
   //nichts in die Konfiguration schreiben - sonst gehen beim Zuruecksetzen
@@ -356,10 +369,16 @@ begin
   loginOptions.ServiceURL := ListView1.Selected.SubItems[1];
   loginOptions.SupplierID := StrToInt(ListView1.Selected.SubItems[3]);
 
+  errors := TStringList.Create;
   Screen.Cursor := crHourGlass;
   try
-    if not TOpenConnectHelper.CheckConnectivitiy(loginOptions,connectivity) then
+    if not TOpenConnectHelper.CheckConnectivitiy(loginOptions,connectivity,errors) then
+    begin
+      Screen.Cursor := crDefault;
+      if errors.Count > 0 then
+        MessageDlg(errors.Text, mtError, [mbOK], 0);
       exit;
+    end;
 
     if connectivity.DatanormOnlineAvailable then
       Label12.Caption := 'verfuegbar'
@@ -435,6 +454,7 @@ begin
 
   finally
     Screen.Cursor := crDefault;
+    errors.Free;
   end;
   finally
     Editable := true;

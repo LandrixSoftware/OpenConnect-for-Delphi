@@ -20,10 +20,7 @@ unit intf.OpenConnect;
 interface
 
 uses
-  System.SysUtils, System.Classes,System.StrUtils,Vcl.Controls,
-  System.Contnrs,Vcl.Dialogs,Vcl.Forms,System.IOUTils,
-  System.Generics.Collections, System.UITypes
-  ;
+  System.SysUtils, System.Classes, System.Generics.Collections;
 
 type
   TOpenConnectSupplier = class(TObject)
@@ -143,14 +140,20 @@ type
     class function GetLastSOAPRequest : String; static;
     class procedure SetLastSOAPRequest(const _Value : String); static;
   public
+    //HTTP-Timeouts in Millisekunden fuer alle SOAP-Aufrufe
+    class var HTTPConnectTimeout : Integer;
+    class var HTTPSendTimeout : Integer;
+    class var HTTPReceiveTimeout : Integer;
+
     class constructor Create;
     class destructor Destroy;
     //Request-Body des letzten AnwenderIndividuelleAuskuenfte-Aufrufs,
     //Passwoerter maskiert - zur Fehlersuche bei Authentifizierungsproblemen
     class property LastSOAPRequest : String read GetLastSOAPRequest write SetLastSOAPRequest;
-    class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
-    class function GetDatanormFileList(_LoginOptions : TOpenConnectLoginOptions; _ResultList : TOpenConnectDatanormFileList) : Boolean;
-    class function CheckConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _Connectivity : TOpenConnectConnectivityOptions) : Boolean;
+    //Fehler werden nicht mehr angezeigt, sondern an _Errors angehaengt (falls uebergeben)
+    class function GetSupplierList(_ResultList : TOpenConnectBusinessList; _Errors : TStrings = nil) : Boolean;
+    class function GetDatanormFileList(_LoginOptions : TOpenConnectLoginOptions; _ResultList : TOpenConnectDatanormFileList; _Errors : TStrings = nil) : Boolean;
+    class function CheckConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _Connectivity : TOpenConnectConnectivityOptions; _Errors : TStrings = nil) : Boolean;
     class function GetErrorCodeAsString(_ErrorNumber : Integer) : String;
     class function MaskPasswords(const _SOAPBody : String) : String;
   end;
@@ -196,6 +199,22 @@ begin
   if TryStrToDate(_Value,Result,fs) then
     exit;
   Result := StrToDateDef(_Value,0);
+end;
+
+procedure AddError(_Errors : TStrings; const _Message : String);
+begin
+  if _Errors <> nil then
+    _Errors.Add(_Message);
+end;
+
+//THTTPRIO mit den konfigurierten Timeouts; gibt sich bei Owner=nil selbst
+//frei, sobald die letzte Interface-Referenz auf das Bean freigegeben wird
+function CreateConfiguredRIO : THTTPRIO;
+begin
+  Result := THTTPRIO.Create(nil);
+  Result.HTTPWebNode.ConnectTimeout := TOpenConnectHelper.HTTPConnectTimeout;
+  Result.HTTPWebNode.SendTimeout := TOpenConnectHelper.HTTPSendTimeout;
+  Result.HTTPWebNode.ReceiveTimeout := TOpenConnectHelper.HTTPReceiveTimeout;
 end;
 
 //Status ist laut Schema optional und kann nil sein
@@ -395,6 +414,9 @@ end;
 class constructor TOpenConnectHelper.Create;
 begin
   FLastSOAPRequestLock := TObject.Create;
+  HTTPConnectTimeout := 30000;
+  HTTPSendTimeout := 60000;
+  HTTPReceiveTimeout := 60000;
 end;
 
 class destructor TOpenConnectHelper.Destroy;
@@ -441,7 +463,7 @@ end;
 
 class function TOpenConnectHelper.GetDatanormFileList(
   _LoginOptions: TOpenConnectLoginOptions;
-  _ResultList: TOpenConnectDatanormFileList): Boolean;
+  _ResultList: TOpenConnectDatanormFileList; _Errors : TStrings): Boolean;
 var
   aia_gb : GetIndividuelleAuskunft;
   aia_b : AnwenderIndividuelleAuskuenfteBean;
@@ -482,7 +504,7 @@ begin
       if not _LoginOptions.Password.Trim.IsEmpty then
         aia_gb.Passwort := _LoginOptions.Password.Trim;
 
-      rio := THTTPRIO.Create(nil);
+      rio := CreateConfiguredRIO;
       rio.OnBeforeExecute := soapCapture.BeforeExecute;
       aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,serviceURL+SHKCONNECT_SERVICE_PROC_AIA,rio);
       aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
@@ -529,8 +551,8 @@ begin
         //_ResultList.SortByDate;
         Result := true;
       end else
-        MessageDlg(serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+StatusText(aia_resp.Status)+#10#10+
-          'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest, mtError, [mbOK], 0);
+        AddError(_Errors,serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+StatusText(aia_resp.Status)+#10#10+
+          'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest);
     finally
       aia_resp.Free;
       aia_b := nil; //gibt das RIO frei, danach darf erst soapCapture freigegeben werden
@@ -538,7 +560,7 @@ begin
       aia_gb.Free;
     end;
   except
-    on E:Exception do begin MessageDlg('GetAnwenderIndividuelleAuskuenfteBean'+#10+e.Message+' '+e.ClassName, mtError, [mbOK], 0); exit; end;
+    on E:Exception do begin AddError(_Errors,serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+e.Message+' ('+e.ClassName+')'); exit; end;
   end;
 end;
 
@@ -560,7 +582,7 @@ begin
   end;
 end;
 
-class function TOpenConnectHelper.GetSupplierList(_ResultList: TOpenConnectBusinessList): Boolean;
+class function TOpenConnectHelper.GetSupplierList(_ResultList: TOpenConnectBusinessList; _Errors : TStrings): Boolean;
 var
   aa_gb : GetAllgemeineAuskunft;
   aa_b : AllgemeineAuskuenfteBean;
@@ -589,7 +611,7 @@ var
         bl_gb.Softwarename := OPENCONNECT_LOGIN;
         bl_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
 
-        bl_b := GetBranchenlisteBean(false,_ServiceURL+SHKCONNECT_SERVICE_PROC_BL);
+        bl_b := GetBranchenlisteBean(false,_ServiceURL+SHKCONNECT_SERVICE_PROC_BL,CreateConfiguredRIO);
         bl_resp := bl_b.GetBranchenListe(bl_gb);
 
         if (bl_resp.Status <> nil) and (bl_resp.Status.Code = '0') then
@@ -601,7 +623,7 @@ var
           end;
           anySuccess := true;
         end else
-          MessageDlg(_ServiceURL+SHKCONNECT_SERVICE_PROC_BL+#10+StatusText(bl_resp.Status), mtError, [mbOK], 0);
+          AddError(_Errors,_ServiceURL+SHKCONNECT_SERVICE_PROC_BL+#10+StatusText(bl_resp.Status));
       finally
         bl_resp.Free;
         bl_b := nil;
@@ -609,6 +631,8 @@ var
       end;
     except
       //Server nicht erreichbar - restliche Dienste trotzdem abfragen
+      on E:Exception do
+        AddError(_Errors,_ServiceURL+SHKCONNECT_SERVICE_PROC_BL+#10+E.Message+' ('+E.ClassName+')');
     end;
   end;
 
@@ -640,7 +664,7 @@ begin
           aa_b := nil;
           aa_resp := nil;
           try
-            aa_b := GetAllgemeineAuskuenfteBean(false,_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA);
+            aa_b := GetAllgemeineAuskuenfteBean(false,_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA,CreateConfiguredRIO);
             aa_resp := aa_b.GetAllgemeineAuskunft(aa_gb);
 
             if (aa_resp.Status <> nil) and (aa_resp.Status.Code = '0') then
@@ -659,20 +683,23 @@ begin
                 supplierItm.PasswordRequired := aa_u.Passwort_erforderlich;
               end;
             end else
-              MessageDlg(_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA+#10+StatusText(aa_resp.Status), mtError, [mbOK], 0);
+              AddError(_Errors,_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA+#10+StatusText(aa_resp.Status));
           finally
             aa_resp.Free;
             aa_b := nil;
           end;
         except
           //einzelner Dienst nicht erreichbar - restliche trotzdem abfragen
+          on E:Exception do
+            AddError(_Errors,_ResultList[i].ServiceURL+SHKCONNECT_SERVICE_PROC_AA+#10+E.Message+' ('+E.ClassName+')');
         end;
       end;
     finally
       aa_gb.Free;
     end;
   except
-//    On E:Exception do begin TLog.Log(true,P_ERROR,'GetAllgemeineAuskuenfteBean',e); exit; end;
+    on E:Exception do
+      AddError(_Errors,'GetAllgemeineAuskunft'+#10+E.Message+' ('+E.ClassName+')');
   end;
 
   //true nur, wenn mindestens eine Branchenliste erfolgreich geladen wurde
@@ -680,7 +707,7 @@ begin
 end;
 
 class function TOpenConnectHelper.CheckConnectivitiy(_LoginOptions: TOpenConnectLoginOptions;
-  out _Connectivity : TOpenConnectConnectivityOptions): Boolean;
+  out _Connectivity : TOpenConnectConnectivityOptions; _Errors : TStrings): Boolean;
 var
   aia_gb : GetIndividuelleAuskunft;
   aia_b : AnwenderIndividuelleAuskuenfteBean;
@@ -725,7 +752,7 @@ begin
     if not _LoginOptions.Password.Trim.IsEmpty then
       aia_gb.Passwort := _LoginOptions.Password.Trim;
 
-    rio := THTTPRIO.Create(nil);
+    rio := CreateConfiguredRIO;
     rio.OnBeforeExecute := soapCapture.BeforeExecute;
     aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,serviceURL+SHKCONNECT_SERVICE_PROC_AIA,rio);
     aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
@@ -777,8 +804,8 @@ begin
         end;
       Result := true;
     end else
-      MessageDlg(serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+StatusText(aia_resp.Status)+#10#10+
-        'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest, mtError, [mbOK], 0);
+      AddError(_Errors,serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+StatusText(aia_resp.Status)+#10#10+
+        'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest);
   finally
     aia_resp.Free;
     aia_b := nil; //gibt das RIO frei, danach darf erst soapCapture freigegeben werden
@@ -786,7 +813,8 @@ begin
     aia_gb.Free;
   end;
   except
-//    On E:Exception do begin TLog.Log(true,P_ERROR,'GetAnwenderIndividuelleAuskuenfteBean',e); exit; end;
+    on E:Exception do
+      AddError(_Errors,serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+E.Message+' ('+E.ClassName+')');
   end;
 end;
 
