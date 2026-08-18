@@ -3,7 +3,7 @@ unit OpenConnectUnit1;
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
+  Winapi.Windows, Winapi.Messages, System.SysUtils, System.StrUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ComCtrls, System.IniFiles,Winapi.ShellAPI,
   Vcl.ExtCtrls, System.UITypes, Vcl.Clipbrd,
   intf.OpenConnect;
@@ -91,7 +91,8 @@ var
 begin
   Suppliers:= TOpenConnectBusinessList.Create;
 
-  if (Pos('Samples\Win32',Application.ExeName)>0) or (Pos('Samples\Win64',Application.ExeName)>0) then
+  //Windows-Pfade sind nicht case-sensitiv, der Vergleich darf es auch nicht sein
+  if ContainsText(Application.ExeName,'Samples\Win32') or ContainsText(Application.ExeName,'Samples\Win64') then
     configurationFilename := ExtractFilePath(ExtractFileDir(ExtractFileDir(Application.ExeName)))
   else
     configurationFilename := ExtractFilePath(Application.ExeName);
@@ -216,12 +217,16 @@ begin
 
   section := ListView1.Selected.SubItems[1]+'-'+ListView1.Selected.SubItems[0]+'-'+ListView1.Selected.SubItems[3];
 
-  if //Trim(Edit1.Text).IsEmpty and Trim(Edit2.Text).IsEmpty and
+  //Sektion nur loeschen, wenn wirklich alles leer ist - sonst wuerde das Leeren
+  //der Zugangsdaten auch die gespeicherte IDSConnect-Konfiguration mit entfernen
+  if Trim(Edit1.Text).IsEmpty and Trim(Edit2.Text).IsEmpty and
      Trim(Edit3.Text).IsEmpty and Trim(Edit4.Text).IsEmpty and Trim(Edit5.Text).IsEmpty  then
   begin
     Configuration.EraseSection(section);
   end else
   begin
+    //Demo: Zugangsdaten werden unverschluesselt in der configuration.ini
+    //gespeichert - fuer den produktiven Einsatz nicht uebernehmen
     Configuration.WriteString(section,'idsconnectprocesses',Edit1.Text);
     Configuration.WriteString(section,'idsconnecturl',Edit2.Text);
     Configuration.WriteString(section,'customerno',Edit3.Text);
@@ -324,10 +329,16 @@ var
   loginOptions : TOpenConnectLoginOptions;
   connectivity: TOpenConnectConnectivityOptions;
 begin
+  //Waehrend die Felder programmgesteuert geaendert werden, darf Edit3Change
+  //nichts in die Konfiguration schreiben - sonst gehen beim Zuruecksetzen
+  //bzw. bei einem fehlgeschlagenen Test die gespeicherten Werte verloren
+  Editable := false;
+  try
   Label12.Caption := '';
   Label7.Caption := '';
   Edit1.Text := '';
-  Edit2.Text := '';
+  //Edit2 (IDSConnect-URL) bewusst nicht leeren - der gespeicherte Wert wird
+  //unten fuer den Vergleich mit der neu gemeldeten URL gebraucht
   Label14.Caption := '';
   Edit6.Text := '';
   Edit7.Text := '';
@@ -362,22 +373,27 @@ begin
 
     Edit1.Text := connectivity.IDSConnectSupportedProcesses;
 
-    if Edit2.Text <> '' then
+    if connectivity.IDSConnectAvailable and (connectivity.IDSConnectURL <> '') then
     begin
-      if not SameText(Edit2.Text,connectivity.IDSConnectURL) then
-      if (MessageDlg('Die IDSConnect-ServiceURL hat sich geaendert.'+#10+
-          'Soll die neue URL eingetragen werden?'+#10+
-          'Alt: '+Edit2.Text+#10+
-          'Neu: '+connectivity.IDSConnectURL, mtWarning, [mbYes, mbNo], 0) = mrYes) then
+      if Edit2.Text <> '' then
+      begin
+        if not SameText(Edit2.Text,connectivity.IDSConnectURL) then
+        if (MessageDlg('Die IDSConnect-ServiceURL hat sich geaendert.'+#10+
+            'Soll die neue URL eingetragen werden?'+#10+
+            'Alt: '+Edit2.Text+#10+
+            'Neu: '+connectivity.IDSConnectURL, mtWarning, [mbYes, mbNo], 0) = mrYes) then
+          Edit2.Text := connectivity.IDSConnectURL;
+      end else
         Edit2.Text := connectivity.IDSConnectURL;
     end else
-      Edit2.Text := connectivity.IDSConnectURL;
+      Edit2.Text := '';
 
     var section : String := ListView1.Selected.SubItems[1]+'-'+ListView1.Selected.SubItems[0]+'-'+ListView1.Selected.SubItems[3];
     Configuration.WriteString(section,'idsconnectprocesses',Edit1.Text);
     Configuration.WriteString(section,'idsconnecturl',Edit2.Text);
 
-    IDSConnectConfigurationAsText  := '['+ListView1.Selected.SubItems[2]+']'+#13#10+
+    if connectivity.IDSConnectAvailable then
+      IDSConnectConfigurationAsText  := '['+ListView1.Selected.SubItems[2]+']'+#13#10+
              'Username='+Edit4.Text+#13#10+
              'Password='+Edit5.Text+#13#10+
              'Customernumber='+Edit3.Text+#13#10+
@@ -419,6 +435,9 @@ begin
 
   finally
     Screen.Cursor := crDefault;
+  end;
+  finally
+    Editable := true;
   end;
 end;
 

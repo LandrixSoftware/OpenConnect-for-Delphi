@@ -243,6 +243,7 @@ object MainForm: TMainForm
       Top = 91
       Width = 121
       Height = 21
+      PasswordChar = '*'
       TabOrder = 5
       OnChange = Edit3Change
     end
