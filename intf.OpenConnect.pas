@@ -120,10 +120,16 @@ type
   TOpenConnectDatanormFileList = class(TObjectList<TOpenConnectDatanormFile>)
   end;
 
+  TOpenConnectSOAPRequestCapture = class(TObject)
+  public
+    RequestBody : String;
+    procedure BeforeExecute(const MethodName: string; SOAPRequest: TStream);
+  end;
+
   TOpenConnectHelper = class(TObject)
   public const
     SHKCONNECT_VERSION = '2.0';
-  
+
     SHKCONNECT_SERVICE_ARGE  = 'https://arge20.shk-connect.de';
     SHKCONNECT_SERVICE_SHKGH = 'https://shkgh20.shk-connect.de';
     SHKCONNECT_SERVICE_OC    = 'https://o-connect.de';
@@ -132,16 +138,21 @@ type
     SHKCONNECT_SERVICE_PROC_AA  = '/services/AllgemeineAuskuenfte';
     SHKCONNECT_SERVICE_PROC_AIA = '/services/AnwenderIndividuelleAuskuenfte';
   public
+    //Request-Body des letzten AnwenderIndividuelleAuskuenfte-Aufrufs,
+    //Passwoerter maskiert - zur Fehlersuche bei Authentifizierungsproblemen
+    class var LastSOAPRequest : String;
     class function GetSupplierList(_ResultList : TOpenConnectBusinessList) : Boolean;
     class function GetDatanormFileList(_LoginOptions : TOpenConnectLoginOptions; _ResultList : TOpenConnectDatanormFileList) : Boolean;
     class function CheckConnectivitiy(_LoginOptions : TOpenConnectLoginOptions; out _Connectivity : TOpenConnectConnectivityOptions) : Boolean;
     class function GetErrorCodeAsString(_ErrorNumber : Integer) : String;
+    class function MaskPasswords(const _SOAPBody : String) : String;
   end;
 
 implementation
 
 uses
-  intf.OpenConnectAllgemeineAuskuenfte
+  Soap.SOAPHTTPClient
+  ,intf.OpenConnectAllgemeineAuskuenfte
   ,intf.OpenConnectAnwenderIndividuelleAuskuenfte
   ,intf.OpenConnectBranchenliste;
 
@@ -292,7 +303,45 @@ begin
   AssignTo(Result);
 end;
 
+{ TOpenConnectSOAPRequestCapture }
+
+procedure TOpenConnectSOAPRequestCapture.BeforeExecute(const MethodName: string; SOAPRequest: TStream);
+var
+  ss : TStringStream;
+begin
+  ss := TStringStream.Create('',TEncoding.UTF8);
+  try
+    SOAPRequest.Position := 0;
+    ss.CopyFrom(SOAPRequest,0);
+    RequestBody := ss.DataString;
+  finally
+    ss.Free;
+  end;
+  SOAPRequest.Position := 0;
+end;
+
 { TOpenConnectHelper }
+
+class function TOpenConnectHelper.MaskPasswords(const _SOAPBody: String): String;
+
+  function MaskTag(const _Body, _TagName : String) : String;
+  var
+    openTag,closeTag : String;
+    startPos,endPos : Integer;
+  begin
+    Result := _Body;
+    openTag := '<'+_TagName+'>';
+    closeTag := '</'+_TagName+'>';
+    startPos := Pos(openTag,Result);
+    endPos := Pos(closeTag,Result);
+    if (startPos > 0) and (endPos > startPos) then
+      Result := Copy(Result,1,startPos+Length(openTag)-1)+'***'+Copy(Result,endPos,MaxInt);
+  end;
+
+begin
+  Result := MaskTag(_SOAPBody,'Softwarepasswort');
+  Result := MaskTag(Result,'Passwort');
+end;
 
 class function TOpenConnectHelper.GetDatanormFileList(
   _LoginOptions: TOpenConnectLoginOptions;
@@ -306,6 +355,8 @@ var
   aia_c : String;//Cookie;
   serviceURL : String;
   dof : TOpenConnectDatanormFile;
+  rio : THTTPRIO;
+  soapCapture : TOpenConnectSOAPRequestCapture;
 begin
   Result := false;
 
@@ -322,12 +373,25 @@ begin
     aia_gb.Softwarename := OPENCONNECT_LOGIN;
     aia_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
     aia_gb.UnternehmensID := _LoginOptions.SupplierID;
-    aia_gb.Kundennummer := _LoginOptions.CustomerNo;
-    aia_gb.Benutzername := _LoginOptions.Username;
-    aia_gb.Passwort := _LoginOptions.Password;
+    //Leere Felder nicht als leere XML-Elemente uebertragen, da einige
+    //Unternehmen vorhandene, aber leere Zugangsdaten-Elemente ablehnen
+    if not _LoginOptions.CustomerNo.Trim.IsEmpty then
+      aia_gb.Kundennummer := _LoginOptions.CustomerNo.Trim;
+    if not _LoginOptions.Username.Trim.IsEmpty then
+      aia_gb.Benutzername := _LoginOptions.Username.Trim;
+    if not _LoginOptions.Password.Trim.IsEmpty then
+      aia_gb.Passwort := _LoginOptions.Password.Trim;
 
-    aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,serviceURL+SHKCONNECT_SERVICE_PROC_AIA);
-    aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
+    soapCapture := TOpenConnectSOAPRequestCapture.Create;
+    try
+      rio := THTTPRIO.Create(nil);
+      rio.OnBeforeExecute := soapCapture.BeforeExecute;
+      aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,serviceURL+SHKCONNECT_SERVICE_PROC_AIA,rio);
+      aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
+      LastSOAPRequest := MaskPasswords(soapCapture.RequestBody);
+    finally
+      soapCapture.Free;
+    end;
 
     if aia_resp.Status.Code = '0' then
     begin
@@ -368,7 +432,8 @@ begin
       //_ResultList.SortByDate;
       Result := true;
     end else
-      MessageDlg(serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung, mtError, [mbOK], 0);
+      MessageDlg(serviceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung+#10#10+
+        'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest, mtError, [mbOK], 0);
 
     aia_resp.Free;
     aia_b := nil;
@@ -555,6 +620,8 @@ var
   aia_resp : GetIndividuelleAuskunftAntwort;
   aia_p : Prozess;
   aia_tp : String;//Teilprozess
+  rio : THTTPRIO;
+  soapCapture : TOpenConnectSOAPRequestCapture;
 begin
   Result := false;
 
@@ -574,12 +641,25 @@ begin
     aia_gb.Softwarename := OPENCONNECT_LOGIN;
     aia_gb.Softwarepasswort := OPENCONNECT_PASSWORD;
     aia_gb.UnternehmensID := _LoginOptions.SupplierID;
-    aia_gb.Kundennummer := _LoginOptions.CustomerNo;
-    aia_gb.Benutzername := _LoginOptions.Username;
-    aia_gb.Passwort := _LoginOptions.Password;
+    //Leere Felder nicht als leere XML-Elemente uebertragen, da einige
+    //Unternehmen vorhandene, aber leere Zugangsdaten-Elemente ablehnen
+    if not _LoginOptions.CustomerNo.Trim.IsEmpty then
+      aia_gb.Kundennummer := _LoginOptions.CustomerNo.Trim;
+    if not _LoginOptions.Username.Trim.IsEmpty then
+      aia_gb.Benutzername := _LoginOptions.Username.Trim;
+    if not _LoginOptions.Password.Trim.IsEmpty then
+      aia_gb.Passwort := _LoginOptions.Password.Trim;
 
-    aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA);
-    aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
+    soapCapture := TOpenConnectSOAPRequestCapture.Create;
+    try
+      rio := THTTPRIO.Create(nil);
+      rio.OnBeforeExecute := soapCapture.BeforeExecute;
+      aia_b := GetAnwenderIndividuelleAuskuenfteBean(false,_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA,rio);
+      aia_resp := aia_b.GetIndividuelleAuskunft(aia_gb);
+      LastSOAPRequest := MaskPasswords(soapCapture.RequestBody);
+    finally
+      soapCapture.Free;
+    end;
 
     if aia_resp.Status.Code = '0' then
     begin
@@ -591,7 +671,7 @@ begin
         if SameText(aia_p.Prozesscode,'SHA') then
         begin
           //Viele liefern mehrere SHA, je nachdem, welche IDS-Connect-Version
-          //unterstützt werden. Allerdings geben sie keine Versionsnummer an
+          //unterstï¿½tzt werden. Allerdings geben sie keine Versionsnummer an
           _Connectivity.IDSConnectAvailable := true;
           _Connectivity.IDSConnectURL := aia_p.URL;
 
@@ -627,7 +707,8 @@ begin
         end;
       Result := true;
     end else
-      MessageDlg(_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung, mtError, [mbOK], 0);
+      MessageDlg(_LoginOptions.ServiceURL+SHKCONNECT_SERVICE_PROC_AIA+#10+aia_resp.Status.Meldung+#10#10+
+        'Gesendeter SOAP-Request (Passwort maskiert):'+#10+LastSOAPRequest, mtError, [mbOK], 0);
 
     aia_resp.Free;
     aia_b := nil;

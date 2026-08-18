@@ -339,9 +339,9 @@ begin
   if ListView1.Selected = nil then
     exit;
 
-  loginOptions.CustomerNo := Edit3.Text;
-  loginOptions.Username := Edit4.Text;
-  loginOptions.Password := Edit5.Text;
+  loginOptions.CustomerNo := Trim(Edit3.Text);
+  loginOptions.Username := Trim(Edit4.Text);
+  loginOptions.Password := Trim(Edit5.Text);
   loginOptions.ServiceURL := ListView1.Selected.SubItems[1];
   loginOptions.SupplierID := StrToInt(ListView1.Selected.SubItems[3]);
 
